@@ -31,7 +31,7 @@ if (from >= to) {
   process.exit(1);
 }
 await mkdir('data', { recursive: true });
-const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const cmd = 'npx';
 const filename = 'xauusd-' + timeframe + '-bid-' + from + '-' + to;
 const args = [
   '--yes', 'dukascopy-node', '-i', 'xauusd', '-from', from, '-to', to,
@@ -41,6 +41,6 @@ const args = [
 console.log('Downloading Dukascopy XAUUSD', timeframe, 'from', from, 'to', to, '(exclusive UTC)');
 console.log('Expected file:', 'data/' + filename + '.csv');
 console.log('For personal research use; do not redistribute data without permission.');
-const child = spawn(cmd, args, { stdio: 'inherit', shell: false });
+const child = spawn(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' });
 child.on('error', err => { console.error(err.message); process.exitCode = 1; });
 child.on('close', code => { process.exitCode = code ?? 1; });
