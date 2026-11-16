@@ -102,6 +102,36 @@ A five-year XAUUSD m15 CSV commonly includes around 120,000–130,000 session ca
 
 
 
+
+## Advanced performance analytics
+
+After a backtest finishes, the **Backtest deep dive** section appears under the realized-equity chart. It has three interactive tabs:
+
+- **Risk & drawdown:** Sharpe, Sortino, Calmar, annualized realized-equity growth, realized maximum drawdown (money and percentage), current drawdown, expectancy, and payoff ratio. A drawdown history plot distinguishes realized peak-to-trough losses from PineTS's own drawdown figure.
+- **Monthly / weekly:** Switch between UTC calendar-month and ISO-week profit/loss, including zero-trade periods, best/worst period, and profitable-period count. Monthly mode includes a multi-year heatmap. Download the full period ledger using **Export CSV**.
+- **Trades & streaks:** Longest winning/losing streak, current streak, recent win/loss sequences, trade outcome distribution, average and extreme winning/losing trades, average holding time, long-versus-short performance, and entry-weekday P&L (UTC).
+
+### Calculation conventions
+
+These analytics use **realized net P&L from PineTS closed trades**. They are not a reconstruction of open-position equity; no intrabar mark-to-market prices are available in the trade list.
+
+- **Expectancy:** sum of closed-trade P&L / number of closed trades; breakeven trades count.
+- **Streaks:** profit above 0 = win, below 0 = loss, equal to 0 = breakeven and resets the current streak. Close timestamps determine order.
+- **Period summaries:** trade P&L belongs to the UTC calendar month or ISO week containing its exit. Months/weeks with no exits appear with $0 and 0 trades.
+- **Closed-trade equity:** initial capital plus the P&L of closed trades. Open positions are excluded.
+- **Realized maximum drawdown:** largest fall in this equity curve below its prior peak, measured in currency and percentage of peak. It is deliberately not interchangeable with PineTS/TradingView's strategy drawdown, which can capture intratrade losses or use different fill assumptions.
+- **Daily return sampling:** the daily change in realized equity divided by the preceding day's positive equity, including flat UTC weekdays (zero return). Saturday and Sunday are excluded for the gold research workflow. Ratios are withheld if equity becomes nonpositive, fewer than 30 weekdays are available, or fewer than 5 trades have closed.
+- **Sharpe:** arithmetic mean daily return / sample standard deviation of daily returns, multiplied by square root of 252. Risk-free rate assumed **0%**.
+- **Sortino:** mean daily return / root mean square of the negative portion of daily returns, multiplied by square root of 252. Minimum target return assumed **0%**.
+- **Annualized realized-equity growth:** (final closed-trade equity / initial equity) raised to (365.2425 / elapsed calendar days), minus 1. Undefined for periods shorter than 30 days or nonpositive capital/equity.
+- **Calmar:** annualized realized growth / realized maximum drawdown percentage. Undefined if drawdown is zero.
+- **N/A:** used for insufficient observations, undefined ratios, and missing averages. The UI does not fabricate a zero.
+- **P&L reconciliation:** if the trade profits do not sum to the PineTS reported net profit, the UI shows an explicit caution about fee or engine reporting differences.
+
+**TradingView comparison:** These calculations are reproducible but do **not necessarily match TradingView's native Sharpe or Sortino**, which can use different return sampling, risk-free reference rates, account equity, and execution rules. Normalize assumptions before comparing platforms.
+
+**Performance:** Insights aggregate the completed trades, not every bar of the 5-year input file. The page shows an explanatory placeholder until a backtest completes.
+
 ## Cloudflare data build: no cloning or terminal required
 
 When this project deploys through Git integration to Cloudflare Pages, npm's prebuild hook automatically requests five calendar years of Dukascopy **XAUUSD BID 15-minute candles**. The current date is used for the rolling range (for example, Nov 2021–Nov 2026). The downloader creates yearly CSV chunks and a manifest in the temporary Cloudflare build directory. Vite publishes them with the site, **without adding price data to the public GitHub repository**.

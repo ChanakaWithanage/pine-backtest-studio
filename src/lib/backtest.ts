@@ -79,6 +79,8 @@ export async function runBacktest(script: string, candles: Candle[], contract: C
   if (!trades.length) warnings.unshift(...zeroTradeHints(script, candles, contract, openTrades, pendingOrders));
   return {
     trades,
+    periodStart: candles[0].time,
+    periodEnd: candles[candles.length - 1].time,
     equity,
     netProfit: state.netprofit,
     initialCapital: state.initial_capital,

@@ -3,6 +3,7 @@ import { ArrowRight, ArrowUpRight, BarChart3, Check, ChevronRight, CircleAlert, 
 import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, type UTCTimestamp } from 'lightweight-charts';
 import { createDemoCandles } from './lib/demo';
 import GoldBreakoutSource from '../samples/gold-breakout-15m.pine?raw';
+import BacktestAnalysis from './BacktestAnalysis';
 import { DEFAULT_CONTRACT } from './lib/csv-provider';
 import { parseHostedManifest } from './lib/hosted';
 import { checkRequestedCoverage, getHistoryCoverage, mergeCandleBatches, pastYearsFromLastCandle } from './lib/history';
@@ -364,6 +365,15 @@ export default function App() {
             </div>
 
             <section className="panel equity-panel"><div className="panel-head"><div><small>ACCOUNT PERFORMANCE</small><h2>Realized equity curve</h2></div>{results && <strong className={results.netProfit >= 0 ? 'positive' : 'negative'}>{money(results.initialCapital + results.netProfit)}</strong>}</div><EquityChart results={results}/><div className="panel-foot"><span>Closed-trade P&L only</span><span>{results ? 'Starting capital ' + money(results.initialCapital) : 'Awaiting results'}</span></div></section>
+
+            {results ? <BacktestAnalysis key={results.periodStart + ':' + results.periodEnd + ':' + results.trades.length}
+              results={results}
+              source={dataSource === 'dukascopy' ? 'Dukascopy XAUUSD BID (not TVC:GOLD)' : dataSource === 'demo' ? 'Synthetic demonstration (not live market data)' : 'User-imported OHLCV (source unverified)'}/>
+              : <div className="panel analysis-awaiting">
+                  <div><BarChart3 size={22}/><strong>Advanced performance analysis</strong></div>
+                  <p>After running your strategy, explore Sharpe, Sortino, realized drawdown, winning/losing streaks, monthly heatmaps, weekly P&L, and long/short trade breakdowns.</p>
+                </div>}
+
 
             <section className="panel trades-panel"><div className="panel-head"><div><small>EXECUTION HISTORY</small><h2>Trade log <span className="count">{results?.trades.length || 0}</span></h2></div><button className="text-button" disabled={!results?.trades.length} onClick={() => results && save(exportTrades(results.trades), 'backtest-trades.csv', 'text/csv')}><FileDown size={15}/> Export all CSV</button></div>
               <div className="table-scroll"><table><thead><tr><th>SIDE</th><th>ENTRY (UTC)</th><th>EXIT (UTC)</th><th>ENTRY</th><th>EXIT</th><th>SIZE</th><th>NET P&L</th></tr></thead><tbody>

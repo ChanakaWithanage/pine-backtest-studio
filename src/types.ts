@@ -32,6 +32,8 @@ export interface EquityPoint { time: number; value: number; }
 
 export interface Results {
   trades: Trade[];
+  periodStart: number; // First selected candle open, UTC milliseconds
+  periodEnd: number; // Last selected candle open, UTC milliseconds
   equity: EquityPoint[]; // Closed-trade realized equity, not intrabar MTM
   netProfit: number;
   initialCapital: number;
