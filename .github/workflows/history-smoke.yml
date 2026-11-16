@@ -24,3 +24,19 @@ jobs:
         run: node scripts/prepare-hosted-history.mjs
       - name: Validate sample manifest
         run: node -e "const m=require('./public/history/manifest.json');if(!m.candleCount||!m.files.length)process.exit(1);console.log(m.provider,m.instrument,m.candleCount,'candles')"
+
+  five_year:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Build actual five-year XAUUSD history
+        env:
+          GOLD_HISTORY_BUILD: '1'
+        run: node scripts/prepare-hosted-history.mjs
+      - name: Verify full history coverage and count
+        run: node -e "const m=require('./public/history/manifest.json');if(m.candleCount<90000||m.files.length<5)process.exit(1);console.log(m.requestedFrom,m.requestedToExclusive,m.candleCount)"
