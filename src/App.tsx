@@ -196,7 +196,7 @@ export default function App() {
         throw new Error('Hosted history exceeds the 75 MB import limit.');
       }
       const parsed = parseCsv(text);
-      applyHistory(parsed, 'Hosted XAUUSD · historical CSV');
+      applyHistory(parsed, 'Hosted OHLCV · source unverified');
     } catch (e) {
       setError('Could not load hosted history. ' +
         (e instanceof Error ? e.message : String(e)) +
@@ -253,9 +253,9 @@ export default function App() {
       <main className="main">
         <div className="breadcrumb">WORKSPACE <ChevronRight size={13}/> STRATEGY BACKTESTER</div>
         <div className="headline"><div><div className="eyebrow"><i/> EXTENDED HISTORY ENGINE</div><h1>Strategy Backtester<span>.</span></h1><p>Run Pine Script strategies on your own historical data, beyond chart history limits.</p></div><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset demo</button></div>
-        <div className="notice"><Info size={17}/><p><strong>{demo ? 'Synthetic demo candles.' : 'Imported market data.'}</strong> {demo ? 'Generated data is only for testing the interface and does not represent real gold prices or trading performance.' : 'Backtests depend on your data feed, fill assumptions and PineTS compatibility. Validate against TradingView.'}</p></div>
+        <div className="notice"><Info size={17}/><p><strong>Target: TradingView TVC:GOLD, 15 minutes, five years.</strong> Exact historical TVC:GOLD candles are not provided by this app. {demo ? 'The default demo is synthetic, not gold.' : 'The current CSV source cannot be verified as TVC:GOLD; results must not be described as TVC:GOLD backtests.'} TradingView permits display of its embedded chart but restricts non-display market data processing without authorization.</p></div>
         <section className="data-strip">
-          <div className="instrument"><div className="au-icon">Au</div><div><strong>XAUUSD <span>GOLD</span></strong><small>{demo ? 'Synthetic sample, not real data' : 'User-imported OHLCV candles'}</small></div></div>
+          <div className="instrument"><div className="au-icon">Au</div><div><strong>TVC:GOLD <span>REFERENCE</span></strong><small>{demo ? 'Backtest source: synthetic demo (NOT TVC:GOLD)' : 'Backtest source: imported CSV (NOT VERIFIED AS TVC:GOLD)'}</small></div></div>
           <div className="strip-item"><small>DATASET</small><strong title={name}>{name}</strong></div>
           <div className="strip-item"><small>AVAILABLE BARS</small><strong>{bars.length.toLocaleString()}</strong></div>
           <div className="strip-item"><small>DATA INTERVAL</small><strong>{interval || '—'}m</strong></div>
@@ -277,14 +277,14 @@ export default function App() {
             </div>
           </div>
           <button onClick={() => { setTab('guide'); document.getElementById('editor')?.scrollIntoView({ behavior: 'smooth' }); }} className="history-guide-link">
-            Get 5 years of gold data <ArrowRight size={15}/>
+            Historical data requirements <ArrowRight size={15}/>
           </button>
         </section>
 
         <div className="workgrid">
           <div className="leftcol">
             <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ Gold</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button><button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button></div></div>
-              {chartView === 'backtest' ? <><div className="chart-bar"><strong>CSV:XAUUSD · {tf}m</strong><span>{demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
+              {chartView === 'backtest' ? <><div className="chart-bar"><strong>IMPORTED:OHLCV · {tf}m</strong><span>{demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
                   <div className="empty-equity price-chart-empty">No candles in the selected date range. Load more history or choose available dates.</div>}<div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
               : <><div className="chart-bar"><strong>TradingView · TVC:GOLD · {tf}m</strong><span>REFERENCE ONLY</span></div><GoldReferenceChart timeframe={tf}/><div className="reference-note"><Info size={15}/> TradingView provides this display-only chart. The candles are not accessible to PineTS. Backtesting uses the separately imported CSV data, never this widget.</div><div className="panel-foot"><a href="https://www.tradingview.com/symbols/TVC-GOLD/" target="_blank" rel="noreferrer">Open TVC:GOLD on TradingView <ArrowUpRight size={13}/></a><span>Data and strategy results are not synchronized</span></div></>}
             </section>
@@ -308,7 +308,7 @@ export default function App() {
 
           <div className="rightcol" id="editor">
             <section className="panel settings-panel"><div className="panel-head"><div><small>CONFIGURATION</small><h2>Backtest setup</h2></div><Settings2 size={18}/></div>
-              <label>Backtest data source</label><div className="locked-field"><span className="mini-au">Au</span><strong>CSV:XAUUSD</strong><span>Not TVC:GOLD</span></div>
+              <label>Backtest data source</label><div className="locked-field"><span className="mini-au">Au</span><strong>IMPORTED:OHLCV</strong><span>Unverified</span></div>
               <label htmlFor="tf">Timeframe</label><select id="tf" value={tf} onChange={e => { setTf(Number(e.target.value)); setResults(null); }}>{OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
               <label>Date range <span>UTC / inclusive</span></label><div className="dates"><input type="date" aria-label="Start date" value={start} onChange={e => { setStart(e.target.value); setResults(null); }}/><input type="date" aria-label="End date" value={end} onChange={e => { setEnd(e.target.value); setResults(null); }}/></div>
               <div className="period-presets"><span>Quick range:</span><button onClick={() => preset(1)}>1Y</button><button onClick={() => preset(3)}>3Y</button><button onClick={() => preset(5)}>5Y</button><button onClick={() => preset('all')}>All loaded</button></div>
@@ -326,7 +326,7 @@ export default function App() {
             </section>
             <section className="panel code-panel"><div className="tabs"><button className={tab === 'editor' ? 'active' : ''} onClick={() => setTab('editor')}><Code2 size={15}/> Pine editor</button><button className={tab === 'guide' ? 'active' : ''} onClick={() => setTab('guide')}><FolderOpen size={15}/> Data guide</button></div>
               {tab === 'editor' ? <><div className="file-header"><FileCode2 size={15}/><strong>{scriptName}</strong><span>v5 / v6</span></div><textarea spellCheck={false} className="editor" aria-label="Pine Script strategy source" value={code} onChange={e => { setCode(e.target.value); setScriptName('untitled.pine'); setResults(null); }}/><div className="editor-footer"><span>{code.split('\n').length} lines</span><input hidden type="file" accept=".pine,.txt,text/plain" ref={pineRef} onChange={e => { void importPine(e.target.files?.[0]); }}/><button onClick={() => pineRef.current?.click()}><FolderOpen size={14}/> Open .pine</button><button onClick={() => save(code, scriptName, 'text/plain')}><Download size={14}/> Save</button></div><p className="editor-note"><Info size={14}/> Use a <strong>strategy()</strong> script. Some TradingView features are not supported by PineTS.</p></>
-                : <div className="guide"><h3>Get 5 years of gold</h3><p>The date picker does not download history. For a five-year, 15-minute XAUUSD backtest, obtain an actual historical CSV from your data provider. For personal research, the repository includes a Dukascopy downloader:</p><span>TERMINAL (RUN ON YOUR COMPUTER)</span><pre>npm run download:gold</pre><p>This defaults to the last five calendar years, 15-minute XAUUSD bid candles, through today's available prices. Output is saved in <code>data/</code>. Select the file using <strong>Import CSV files</strong>. You can also select several yearly files together or append new ones. A 15-minute file cannot generate 3-minute candles; use 1-minute source data for that.</p><p>Dukascopy XAUUSD is a different feed from TradingView's TVC:GOLD. Downloading is for your own research; check provider terms before publishing data on a public website.</p><a href={REPO + '#historical-gold-data'} target="_blank" rel="noreferrer">View setup guide <ArrowUpRight size={14}/></a></div>}
+                : <div className="guide"><h3>Exact TVC:GOLD data</h3><p>The target is TradingView <strong>TVC:GOLD</strong> on 15-minute candles for five years. It is a TradingView-calculated feed, not interchangeable with Dukascopy XAUUSD or other spot-gold products.</p><p><strong>Five-year TVC:GOLD history is not available through the public TradingView widget or an unrestricted public candle API.</strong> A compliant external backtest requires a data source that explicitly authorizes processing this exact feed. We will not scrape TradingView or silently substitute XAUUSD.</p><p>The CSV importer remains available for datasets you are authorized to process, but imported CSVs are labeled <strong>unverified OHLCV</strong>, not TVC:GOLD. Date-range controls only select candles that have actually been loaded.</p><a href={REPO + '#exact-tv-cgold-requirement'} target="_blank" rel="noreferrer">Read exact-symbol requirements <ArrowUpRight size={14}/></a></div>}
             </section>
             {error && <div className="error" role="alert"><CircleAlert size={20}/><div><strong>Backtest needs attention</strong><p>{error}</p></div><button onClick={() => setError('')}>×</button></div>}
             {results && results.trades.length === 0 && <section className="zero-diagnostics" role="status"><div className="zero-title"><CircleAlert size={19}/><strong>0 closed trades · diagnostic report</strong></div><p>The engine ran, but did not report closed orders. These checks help distinguish missing price breakouts from unsupported Pine behavior.</p><ul>{results.warnings.slice(0, 6).map((hint, i) => <li key={i}>{hint}</li>)}</ul></section>}

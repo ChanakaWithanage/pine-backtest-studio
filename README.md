@@ -1,6 +1,16 @@
 # Pine Backtest Studio
 
-A browser-based Pine Script strategy backtesting workspace for extended historical datasets. Designed initially for XAUUSD/gold, with custom CSV market data, a Pine v5/v6 editor, execution charts, and downloadable trade logs.
+## Exact TVC:GOLD requirement
+
+The strategy must be tested against **TradingView's calculated TVC:GOLD feed**, not generic XAUUSD, a broker CFD, Dukascopy XAUUSD, or COMEX futures. The project is not yet capable of five years of authentic 15-minute TVC:GOLD backtesting, because it lacks an authorized historical TVC:GOLD data feed.
+
+TradingView confirms that its TVC symbols are calculated by TradingView and may differ from otherwise similar instruments. Its free widget can display TVC:GOLD but does not expose candles to our independent strategy engine; TradingView's terms prohibit unauthorized data extraction and non-display processing. Use TVC:GOLD in TradingView's own backtesting tools, or arrange a separate permission/license allowing external backtests using this exact source. **Do not assume a chart CSV export grants rights for third-party automated processing.**
+
+The legacy optional XAUUSD downloader remains available only for separate research on *different feeds*, **not** as the requested TVC:GOLD substitute. Any CSV import is labeled unverified until a lawful exact-symbol source can be established.
+
+---
+
+A browser-based Pine Script strategy backtesting workspace. The **requested target is TradingView TVC:GOLD**, 15-minute candles across five years. The app currently **does not have this exact historical feed**; its live TradingView widget is display-only and imported OHLCV data is explicitly unverified. It must not be presented as an authentic TVC:GOLD backtest.
 
 **Stack:** React 19, TypeScript, Vite, PineTS, TradingView Lightweight Charts. Static frontend; no backend or API key required.
 
@@ -8,7 +18,7 @@ A browser-based Pine Script strategy backtesting workspace for extended historic
 
 ## Features
 
-- Upload historical CSV (Dukascopy's XAUUSD format or your own OHLCV data).
+- Upload historical OHLCV CSV that you have the right to process (source identity is not verified by the app).
 - Run Pine v5/v6 **strategy** source with PineTS's broker emulator in a browser Web Worker.
 - Select an inclusive UTC date range; aggregate finer source candles to 3m, 5m, 15m, 30m, 1h or 4h.
 - View a candlestick chart with entry and exit markers, win rate, net profit, profit factor, drawdown, realized equity, and a trade log.

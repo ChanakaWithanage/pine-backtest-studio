@@ -7,7 +7,7 @@ import type { Candle, ContractSettings } from '../types';
  * PineTS doesn't infer syminfo fields from bare OHLCV arrays. Without pointvalue
  * and mincontract, risk-sized Pine strategies can calculate NaN/zero quantity.
  *
- * "CSV:XAUUSD" is a placeholder symbol identity, not a licensed TVC:GOLD feed.
+ * "IMPORTED:OHLCV" is generic placeholder metadata. Never claim the input is TVC:GOLD.
  */
 export const DEFAULT_CONTRACT: ContractSettings = {
   pointvalue: 1,
@@ -36,10 +36,10 @@ export function buildCsvPineProvider(candles: Candle[], settings: ContractSettin
     takerBuyQuoteAssetVolume: 0, ignore: 0
   }));
   const symbolInfo = {
-    current_contract: '', description: 'User-imported gold OHLCV',
-    isin: '', main_tickerid: 'CSV:XAUUSD', prefix: 'CSV',
-    root: 'XAUUSD', ticker: 'XAUUSD', tickerid: 'CSV:XAUUSD', type: 'forex',
-    basecurrency: 'XAU', country: '', currency: 'USD', timezone: 'Etc/UTC',
+    current_contract: '', description: 'User-imported unverified OHLCV',
+    isin: '', main_tickerid: 'IMPORTED:OHLCV', prefix: 'IMPORTED',
+    root: 'OHLCV', ticker: 'OHLCV', tickerid: 'IMPORTED:OHLCV', type: 'forex',
+    basecurrency: '', country: '', currency: 'USD', timezone: 'Etc/UTC',
     employees: 0, industry: '', sector: '', shareholders: 0,
     shares_outstanding_float: 0, shares_outstanding_total: 0,
     expiration_date: 0, session: '24x7', volumetype: 'tick',
@@ -52,7 +52,7 @@ export function buildCsvPineProvider(candles: Candle[], settings: ContractSettin
     target_price_high: 0, target_price_low: 0, target_price_median: 0
   };
   return {
-    tickerId: 'CSV:XAUUSD',
+    tickerId: 'IMPORTED:OHLCV',
     timeframe: requested,
     marketData,
     symbolInfo,
