@@ -9,6 +9,7 @@ test('PineTS executes a native v6 strategy against custom OHLCV candles', { time
   assert.ok(Number.isFinite(results.netProfit));
   assert.ok(Number.isFinite(results.initialCapital));
   assert.ok(Array.isArray(results.trades));
+  console.log('EMA_SMOKE', JSON.stringify({ trades: results.trades.length, pending: results.pendingOrders, open: results.openTrades, net: results.netProfit }));
   assert.ok(results.equity.length >= 1);
   assert.ok(results.winRate >= 0 && results.winRate <= 100);
   for (const trade of results.trades) {
@@ -35,6 +36,7 @@ if bar_index == 4
 plot(observedClose, "bar_duration")
 `;
   const r = await runBacktest(script, candles, { pointvalue: 1, mincontract: 0.01, mintick: 0.01 });
+  console.log('GOLD_SMOKE', JSON.stringify({ trades: r.trades.length, pending: r.pendingOrders, open: r.openTrades, net: r.netProfit, warnings: r.warnings }));
   assert.equal(r.trades.length, 1, 'known strategy must close a risk-sized order');
   assert.ok(r.trades[0].size > 0);
 });
