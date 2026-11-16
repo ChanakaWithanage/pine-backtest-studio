@@ -36,7 +36,6 @@ export async function runBacktest(script: string, candles: Candle[]): Promise<Re
     openTime: c.time, open: c.open, high: c.high,
     low: c.low, close: c.close, volume: c.volume
   })));
-  pine.setExecutionTimeout(60_000);
   pine.setMaxLoops(10_000_000);
   const context = await pine.run(script);
   const state = context.strategy as unknown as PineState | undefined;
