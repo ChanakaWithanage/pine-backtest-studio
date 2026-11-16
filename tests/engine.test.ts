@@ -52,8 +52,18 @@ indicator("metadata")
 plot(syminfo.pointvalue, "point")
 plot(syminfo.mincontract, "step")
 plot(time_close - time, "duration")
+plot(math.floor(200 / (close * 0.01 * syminfo.pointvalue) / syminfo.mincontract) * syminfo.mincontract, "qtycalc")
 `);
-  console.log('SYMBOL_META', JSON.stringify({ info: feed.symbolInfo, point: ctx.plots['point']?.data.slice(-2), step: ctx.plots['step']?.data.slice(-2), duration: ctx.plots['duration']?.data.slice(-2) }));
+  console.log('SYMBOL_META', JSON.stringify({ info: feed.symbolInfo, point: ctx.plots['point']?.data.slice(-2), step: ctx.plots['step']?.data.slice(-2), duration: ctx.plots['duration']?.data.slice(-2), qty: ctx.plots['qtycalc']?.data.slice(-2) }));
+  const qtyCode = `//@version=6
+strategy("Qty Only")
+if bar_index == 1
+    strategy.entry("Q", strategy.long, qty=syminfo.mincontract)
+if bar_index == 4
+    strategy.close("Q")
+`;
+  const q = await runBacktest(qtyCode, candles);
+  console.log('STEP_SMOKE', JSON.stringify({ trades: q.trades.length, open: q.openTrades, pending: q.pendingOrders }));
   const r = await runBacktest(script, candles, { pointvalue: 1, mincontract: 0.01, mintick: 0.01 });
   console.log('GOLD_SMOKE', JSON.stringify({ trades: r.trades.length, pending: r.pendingOrders, open: r.openTrades, net: r.netProfit, warnings: r.warnings }));
   assert.equal(r.trades.length, 1, 'known strategy must close a risk-sized order');
