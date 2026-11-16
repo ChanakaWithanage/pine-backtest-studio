@@ -27,13 +27,12 @@ test('gold-style session and risk sizing receive valid timestamp and symbol meta
   const candles = createDemoCandles().slice(0, 250);
   const script = `//@version=6
 strategy("Metadata Smoke Test", initial_capital=10000)
-var float observedClose = na
+float quantity = math.floor(200 / (close * 0.01 * syminfo.pointvalue) / syminfo.mincontract) * syminfo.mincontract
+plot(quantity, "calculated_qty")
 if bar_index == 1
-    observedClose := time_close - time
-    strategy.entry("Meta", strategy.long, qty = math.floor(200 / (close * 0.01 * syminfo.pointvalue) / syminfo.mincontract) * syminfo.mincontract)
+    strategy.entry("Meta", strategy.long, qty = quantity)
 if bar_index == 4
     strategy.close("Meta")
-plot(observedClose, "bar_duration")
 `;
   const basic = `//@version=6
 strategy("Basic")
