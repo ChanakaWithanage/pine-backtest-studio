@@ -35,6 +35,25 @@ if bar_index == 4
     strategy.close("Meta")
 plot(observedClose, "bar_duration")
 `;
+  const basic = `//@version=6
+strategy("Basic")
+if bar_index == 1
+    strategy.entry("L", strategy.long, qty=1)
+if bar_index == 4
+    strategy.close("L")
+`;
+  const basicResult = await runBacktest(basic, candles);
+  console.log('BASIC_SMOKE', JSON.stringify({ trades: basicResult.trades.length, pending: basicResult.pendingOrders, open: basicResult.openTrades }));
+  const { PineTS } = await import('pinets');
+  const { buildCsvPineProvider } = await import('../src/lib/csv-provider.ts');
+  const feed = buildCsvPineProvider(candles, { pointvalue: 1, mincontract: 0.01, mintick: 0.01 });
+  const ctx = await new PineTS(feed.provider, feed.tickerId, feed.timeframe).run(`//@version=6
+indicator("metadata")
+plot(syminfo.pointvalue, "point")
+plot(syminfo.mincontract, "step")
+plot(time_close - time, "duration")
+`);
+  console.log('SYMBOL_META', JSON.stringify({ info: feed.symbolInfo, point: ctx.plots['point']?.data.slice(-2), step: ctx.plots['step']?.data.slice(-2), duration: ctx.plots['duration']?.data.slice(-2) }));
   const r = await runBacktest(script, candles, { pointvalue: 1, mincontract: 0.01, mintick: 0.01 });
   console.log('GOLD_SMOKE', JSON.stringify({ trades: r.trades.length, pending: r.pendingOrders, open: r.openTrades, net: r.netProfit, warnings: r.warnings }));
   assert.equal(r.trades.length, 1, 'known strategy must close a risk-sized order');
