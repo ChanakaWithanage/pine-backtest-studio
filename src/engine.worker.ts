@@ -3,9 +3,9 @@ import { runBacktest } from './lib/backtest';
 import type { WorkerRequest, WorkerResponse } from './types';
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { id, code, candles, contract } = event.data;
+  const { id, code, candles, contract, fees } = event.data;
   try {
-    const results = await runBacktest(code, candles, contract);
+    const results = await runBacktest(code, candles, contract, fees);
     const message: WorkerResponse = { id, type: 'success', results };
     self.postMessage(message);
   } catch (error) {

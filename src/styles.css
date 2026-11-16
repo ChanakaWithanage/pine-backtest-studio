@@ -165,3 +165,25 @@ footer{display:flex;justify-content:space-between;gap:15px;padding:29px 0 4px;co
 .date-coverage-alert{margin:-8px 19px 15px;color:#f4cb8c;font-size:10px;line-height:1.55}
 .price-chart-empty{height:340px;padding:25px;text-align:center}
 @media(max-width:800px){.history-coverage{flex-direction:column;align-items:stretch}.history-guide-link{justify-content:center}.coverage-metric{min-width:155px}}
+
+
+/* Exchange commission configuration and fee attribution */
+.commission-settings{margin:0 19px 16px;padding:13px;background:#142132;border:1px solid #375568;border-radius:9px}
+.commission-settings summary{cursor:pointer;color:#e2f4ed;font-size:11px;font-weight:750;line-height:1.5}
+.commission-settings summary span{display:block;color:#8bb6ab;font-size:10px;font-weight:500;margin-top:5px}
+.commission-rate-row{display:grid;grid-template-columns:minmax(0,1fr) 95px;gap:12px;align-items:center;margin-top:16px}
+.commission-rate-row label{font-size:10px;color:#a4bbc9}
+.commission-rate-row input{width:100%;min-width:0;padding:9px;background:#182c3d;border:1px solid #38586c;color:#e7f8f4;border-radius:6px;font-size:12px}
+.commission-override{display:flex;align-items:flex-start;gap:9px;margin:14px 0;padding:0;color:#bcd2dc;font-size:11px;line-height:1.6;cursor:pointer}
+.commission-override input{flex:none;margin:3px 0 0;accent-color:#4acdac;width:15px;height:15px}
+.commission-policy{border:1px solid #31594d;background:#132f2b;display:flex;gap:9px;padding:11px;border-radius:8px}
+.commission-policy.using-pine{border-color:#475d70;background:#1a2a37}
+.commission-policy>svg{flex:none;margin-top:2px;color:#78dbc6}
+.commission-policy strong{font-size:11px;color:#d8eee8;line-height:1.5}
+.commission-policy p{font-size:10px;color:#b8d1c6;line-height:1.55;margin:6px 0 0}
+.commission-policy small{font-size:10px;color:#a7bdcb;line-height:1.55;display:block;overflow-wrap:anywhere;margin-top:6px}
+.commission-caveat{font-size:10px;color:#879eae;line-height:1.6;margin:12px 0 0}
+.metrics{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:1450px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.commission-rate-row{grid-template-columns:minmax(0,1fr) 86px}.commission-settings{padding:11px}}

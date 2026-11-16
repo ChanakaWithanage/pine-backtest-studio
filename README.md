@@ -103,6 +103,23 @@ A five-year XAUUSD m15 CSV commonly includes around 120,000–130,000 session ca
 
 
 
+
+## Binance-style futures commission settings
+
+Binance regular-account USDⓈ-M futures **taker** commission is **0.05% of executed notional per fill**, charged when opening **and** again when closing. The regular-account **maker** commission is typically 0.02%; exact costs depend on contract, account VIP tier, BNB discounts, liquidity provision, region and promotions. [Binance futures fee calculations](https://www.binance.com/en/support/faq/detail/360033544231) · [Binance fee schedule](https://www.binance.com/en/fee/futureFee)
+
+The Backtest setup panel now includes **Binance futures commissions** with:
+
+- **Default rate 0.05% per execution**, configurable from 0 to 5%. At a $1,000 notional, this corresponds to $0.50 entry + approximately $0.50 exit if the closing notional is unchanged.
+- **Respect existing Pine commission automatically**. When the script already declares a commission in its strategy() header, the app leaves that script untouched and adds **no further fee**. Explicit 0% is also respected. The supplied Gold Breakout 15M v1.1.0 already declares cash_per_order at 0.4 per fill, so that remains the effective fee in the default mode.
+- **Override Pine commission** (opt-in checkbox). To simulate Binance's percentage fee instead, check this setting. The app replaces the existing strategy() commission_type and commission_value fields **in the runtime copy only** with percent and the configured rate. It never stacks the two charges and does not alter the source displayed in the Pine editor.
+- **Strategies without a commission** automatically get the configured 0.05% fee by adding the Pine strategy() percent commission fields before execution.
+- **Results show total commissions** collected for closed trades plus any fees on currently open positions, the effective fee type, and whether the Pine or app setting was used. Closed-trade P&L, net profit, profit factor, and analytics are calculated by PineTS after its broker emulator deducts the effective commissions.
+
+The strategy runs with the chosen fees from the outset rather than subtracting a second cost from the report afterward; it can therefore account for fee-driven changes to strategy equity and sizing. A round trip's notional may differ between entry and exit. Only commissions are modeled here; **funding, spread, liquidation, exchange differences, slippage and maker/taker classification are not inferred automatically**.
+
+This fee schedule is a *Binance-style trading-cost assumption* applied to the imported gold feed, **not** a claim that Dukascopy XAUUSD or TVC:GOLD is a Binance futures contract.
+
 ## Advanced performance analytics
 
 After a backtest finishes, the **Backtest deep dive** section appears under the realized-equity chart. It has three interactive tabs:

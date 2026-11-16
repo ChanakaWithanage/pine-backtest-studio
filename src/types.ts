@@ -1,3 +1,4 @@
+import type { FeeSettings } from './lib/commissions';
 export interface Candle {
   time: number; // Unix milliseconds at candle open (UTC)
   open: number;
@@ -30,7 +31,20 @@ export interface Trade {
 
 export interface EquityPoint { time: number; value: number; }
 
+export interface FeeSummary {
+  source: 'pine' | 'app';
+  overridden: boolean;
+  configuredRatePercent: number | null;
+  actualType: string;
+  actualValue: number;
+  closedTradeCommissions: number;
+  openTradeEntryCommissions: number;
+  description: string;
+  pineDeclaration: string;
+}
+
 export interface Results {
+  fees: FeeSummary;
   trades: Trade[];
   periodStart: number; // First selected candle open, UTC milliseconds
   periodEnd: number; // Last selected candle open, UTC milliseconds
@@ -53,6 +67,7 @@ export interface WorkerRequest {
   code: string;
   candles: Candle[];
   contract: ContractSettings;
+  fees: FeeSettings;
 }
 
 export type WorkerResponse =

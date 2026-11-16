@@ -1,6 +1,7 @@
 import { PineTS } from 'pinets';
 import { DEFAULT_CONTRACT, buildCsvPineProvider } from './csv-provider.ts';
 import { zeroTradeHints } from './diagnostics.ts';
+import { DEFAULT_FEES, planCommissions, type FeeSettings } from './commissions.ts';
 import type { Candle, Results, Trade, EquityPoint, ContractSettings } from '../types';
 
 interface PineTrade {
@@ -24,9 +25,10 @@ interface PineState {
   closedtrades: PineTrade[];
   opentrades: PineTrade[];
   pending_orders?: unknown[];
+  config?: { commission_type?: string; commission_value?: number };
 }
 
-export async function runBacktest(script: string, candles: Candle[], contract: ContractSettings = DEFAULT_CONTRACT): Promise<Results> {
+export async function runBacktest(script: string, candles: Candle[], contract: ContractSettings = DEFAULT_CONTRACT, feeSettings: FeeSettings = DEFAULT_FEES): Promise<Results> {
   if (!/\/\/\s*@version\s*=\s*[56]\b/.test(script)) {
     throw new Error('Add //@version=5 or //@version=6 to the top of the Pine Script.');
   }
@@ -38,10 +40,11 @@ export async function runBacktest(script: string, candles: Candle[], contract: C
   // A bare PineTS candle array has no syminfo metadata; the uploaded Gold
   // Breakout strategy depends on mincontract and pointvalue to create orders.
   // Pass the real timeframe so time_close and broker sessions are correct.
+  const feePlan = planCommissions(script, feeSettings);
   const feed = buildCsvPineProvider(candles, contract);
   const pine = new PineTS(feed.provider, feed.tickerId, feed.timeframe);
   pine.setMaxLoops(10_000_000);
-  const context = await pine.run(script);
+  const context = await pine.run(feePlan.script);
   const state = context.strategy as unknown as PineState | undefined;
   if (!state || !Array.isArray(state.closedtrades)) {
     throw new Error('PineTS did not return a strategy state. Check strategy() and supported Pine features.');
@@ -77,7 +80,23 @@ export async function runBacktest(script: string, candles: Candle[], contract: C
     'Contract settings represent the imported CSV instrument, not TVC:GOLD or a verified broker specification.'
   ];
   if (!trades.length) warnings.unshift(...zeroTradeHints(script, candles, contract, openTrades, pendingOrders));
+  warnings.push('Commission policy: ' + feePlan.description);
+  const closedTradeCommissions = trades.reduce((total, trade) => total + trade.commission, 0);
+  const openTradeEntryCommissions = (state.opentrades || []).reduce(
+    (total, trade) => total + (trade.commission || 0), 0
+  );
   return {
+    fees: {
+      source: feePlan.source,
+      overridden: feePlan.overridden,
+      configuredRatePercent: feePlan.ratePercent,
+      actualType: state.config?.commission_type ?? (feePlan.source === 'app' ? 'percent' : 'unknown'),
+      actualValue: state.config?.commission_value ?? (feePlan.source === 'app' ? feeSettings.percent : 0),
+      closedTradeCommissions,
+      openTradeEntryCommissions,
+      description: feePlan.description,
+      pineDeclaration: feePlan.declaration
+    },
     trades,
     periodStart: candles[0].time,
     periodEnd: candles[candles.length - 1].time,
