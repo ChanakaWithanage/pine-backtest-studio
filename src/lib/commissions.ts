@@ -2,21 +2,52 @@
  * No P&L post-processing: PineTS calculates entry AND exit fees during fills.
  * We never stack a separate fee on top of an existing Pine commission.
  */
+export type BybitMode = 'zero-fee' | 'tight-spread';
+
+export interface BybitSettings {
+  enabled: boolean;
+  mode: BybitMode;
+  /** What-if full bid/ask spread in USD per gold ounce. Not a live quote. */
+  spreadUsd: number;
+  /** Bybit metals Tight-Spread commission, USD per standard lot, per round trip. */
+  commissionPerLotUsd: number;
+  /** Gold ounces in one Bybit standard lot. A custom assumption. */
+  ouncesPerLot: number;
+  /** Optional manually supplied swap cost per lot per UTC midnight rollover; zero by default. */
+  overnightUsdPerLot: number;
+}
+export const DEFAULT_BYBIT: BybitSettings = {
+  enabled: false, mode: 'zero-fee', spreadUsd: 0.50,
+  commissionPerLotUsd: 6, ouncesPerLot: 100, overnightUsdPerLot: 0
+};
+
+export interface BybitPlan {
+  mode: BybitMode;
+  requestedSpreadUsd: number;
+  appliedSpreadUsd: number;
+  ticksPerFill: number;
+  commissionPerLotUsd: number;
+  ouncesPerLot: number;
+  overnightUsdPerLot: number;
+}
+
 export interface FeeSettings {
   /** Taker commission per execution (entry and exit), expressed as a percent of notional. */
   percent: number;
   /** false: use existing strategy() fees; true: replace them with this percent. */
   overridePine: boolean;
+  bybit?: BybitSettings;
 }
 export const DEFAULT_FEES: FeeSettings = { percent: 0.05, overridePine: false };
 
 export interface CommissionPlan {
   script: string;
-  source: 'pine' | 'app';
+  source: 'pine' | 'app' | 'bybit';
   overridden: boolean;
   ratePercent: number | null;
   description: string;
   declaration: string;
+  bybit?: BybitPlan;
 }
 
 const isIdent = (char: string | undefined) => !!char && /[a-zA-Z0-9_]/.test(char);
@@ -165,4 +196,103 @@ export function planCommissions(source: string, settings: FeeSettings = DEFAULT_
       : 'The app added ' + settings.percent + '% per entry and exit fill because Pine had no commission.',
     declaration
   };
+}
+
+
+function replaceStrategyFields(source: string, replacements: Record<string, string>): string {
+  const decl = findDeclaration(source);
+  const args = splitArguments(source.slice(decl.open + 1, decl.end));
+  const keys = Object.keys(replacements);
+  const kept = args.filter(part => {
+    const normalized = stripComments(part).trim();
+    if (!normalized) return false;
+    return !keys.some(key => new RegExp('^' + key + '\\s*=').test(normalized));
+  });
+  const inside = '\n     ' + [...kept.map(s => s.trim()), ...Object.values(replacements)]
+    .join(',\n     ') + '\n';
+  return source.slice(0, decl.open + 1) + inside + source.slice(decl.end);
+}
+
+/**
+ * Bybit CFD cost assumptions are injected BEFORE simulation, so net P&L,
+ * profit factor and fee-aware equity sizing use the same execution pass.
+ *
+ * PineTS applies its cash_per_contract fee on BOTH fills. Bybit's documented
+ * $6/lot CFD fee is collected at opening. We split that round-trip amount
+ * $3/lot per fill to avoid charging $12 per lot. Closed position total is
+ * correct; open-position fee timing is only an approximation.
+ *
+ * PineTS slippage is expressed in price ticks per execution, not dollar P&L.
+ * Half the configured full spread is applied against each fill, so an
+ * ordinary complete round trip incurs approximately one full spread.
+ * This is a constant-spread what-if model, NOT actual Bybit bid/ask quotes.
+ */
+export function planExecutionCosts(
+  source: string,
+  settings: FeeSettings = DEFAULT_FEES,
+  pointvalue = 1,
+  mintick = 0.01
+): CommissionPlan {
+  if (!settings.bybit?.enabled) return planCommissions(source, settings);
+  const bybit = settings.bybit;
+  const finiteInRange = (value: number, low: number, high: number, name: string) => {
+    if (!Number.isFinite(value) || value < low || value > high) {
+      throw new Error(name + ' must be between ' + low + ' and ' + high + '.');
+    }
+  };
+  if (bybit.mode !== 'zero-fee' && bybit.mode !== 'tight-spread') {
+    throw new Error('Choose Bybit Zero-Fee or Tight-Spread account mode.');
+  }
+  finiteInRange(bybit.spreadUsd, 0, 100, 'Estimated full spread (USD/oz)');
+  finiteInRange(bybit.commissionPerLotUsd, 0, 1000, 'Commission per standard lot (USD)');
+  finiteInRange(bybit.ouncesPerLot, 0.001, 1000000, 'Gold ounces per lot');
+  finiteInRange(bybit.overnightUsdPerLot, -1000, 1000, 'Estimated overnight swap (USD/lot)');
+  finiteInRange(pointvalue, 0.00000001, 1000000, 'Instrument point value');
+  finiteInRange(mintick, 0.00000001, 1000, 'Instrument minimum tick');
+
+  // Round spread UP to a whole number of per-leg ticks rather than
+  // silently simulating a smaller spread than the entered assumption.
+  const ticksPerFill = Math.ceil(bybit.spreadUsd / (2 * mintick) - 1e-9);
+  const appliedSpreadUsd = Number((2 * ticksPerFill * mintick).toPrecision(12));
+  const feePerContractPerFill = bybit.mode === 'tight-spread'
+    ? (bybit.commissionPerLotUsd * pointvalue) / (2 * bybit.ouncesPerLot)
+    : 0;
+  const old = findDeclaration(source);
+  const original = source.slice(old.open + 1, old.end);
+  const commission = commissionArguments(original);
+  const oldPine = commission.type || commission.value;
+  const declaration = oldPine
+    ? 'Original Pine fees replaced by Bybit CFD simulation'
+    : 'No Pine commission specified; using Bybit CFD simulation';
+  const rewritten = replaceStrategyFields(source, {
+    commission_type: 'commission_type = strategy.commission.cash_per_contract',
+    commission_value: 'commission_value = ' + Number(feePerContractPerFill.toPrecision(12)),
+    slippage: 'slippage = ' + ticksPerFill
+  });
+  const description = (bybit.mode === 'tight-spread' ? 'Bybit CFD Tight-Spread' : 'Bybit CFD Zero-Fee') +
+    ': modeled ' + appliedSpreadUsd.toFixed(2) + ' USD/oz spread' +
+    (bybit.mode === 'tight-spread'
+      ? ' plus $' + bybit.commissionPerLotUsd.toFixed(2) + '/lot round-trip commission'
+      : ', no separate commission') +
+    '. Both Pine commission and Pine slippage are replaced, not stacked.';
+  return {
+    script: rewritten, source: 'bybit', overridden: Boolean(oldPine),
+    ratePercent: null, description, declaration,
+    bybit: {
+      mode: bybit.mode,
+      requestedSpreadUsd: bybit.spreadUsd,
+      appliedSpreadUsd,
+      ticksPerFill,
+      commissionPerLotUsd: bybit.mode === 'tight-spread' ? bybit.commissionPerLotUsd : 0,
+      ouncesPerLot: bybit.ouncesPerLot,
+      overnightUsdPerLot: bybit.overnightUsdPerLot
+    }
+  };
+}
+
+/** Approximate number of UTC-midnight boundaries crossed. Bybit's actual
+ * rollover uses its server clock and may charge three-day rates on Wednesday. */
+export function estimatedUtcRollovers(entryTime: number, exitTime: number): number {
+  if (exitTime <= entryTime || !Number.isFinite(entryTime) || !Number.isFinite(exitTime)) return 0;
+  return Math.max(0, Math.floor(exitTime / 86400000) - Math.floor(entryTime / 86400000));
 }

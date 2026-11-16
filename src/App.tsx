@@ -5,7 +5,8 @@ import { createDemoCandles } from './lib/demo';
 import GoldBreakoutSource from '../samples/gold-breakout-15m.pine?raw';
 import BacktestAnalysis from './BacktestAnalysis';
 import { DEFAULT_CONTRACT } from './lib/csv-provider';
-import { DEFAULT_FEES, planCommissions, type FeeSettings } from './lib/commissions';
+import { DEFAULT_FEES, DEFAULT_BYBIT, planExecutionCosts, type FeeSettings, type BybitSettings } from './lib/commissions';
+import { BybitSettingsPanel, BybitResultsPanel } from './BybitComponents';
 import { parseHostedManifest } from './lib/hosted';
 import { checkRequestedCoverage, getHistoryCoverage, mergeCandleBatches, pastYearsFromLastCandle } from './lib/history';
 import { exportTrades, inferIntervalMinutes, parseCsv, resampleCandles } from './lib/csv';
@@ -126,10 +127,14 @@ export default function App() {
   const historyRequestSeq = useRef(0);
   const csvModeRef = useRef<'replace' | 'append'>('replace');
   const [contract, setContract] = useState<ContractSettings>({ ...DEFAULT_CONTRACT });
-  const [fees, setFees] = useState<FeeSettings>({ ...DEFAULT_FEES });
+  const [fees, setFees] = useState<FeeSettings>({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } });
   const [start, setStart] = useState(day(DEMO[0].time));
   const [end, setEnd] = useState(day(DEMO[DEMO.length - 1].time));
   const [results, setResults] = useState<Results | null>(null);
+  const updateBybit = (changes: Partial<BybitSettings>) => {
+    setFees(previous => ({ ...previous, bybit: { ...(previous.bybit ?? DEFAULT_BYBIT), ...changes } }));
+    setResults(null);
+  };
   const [usedBars, setUsedBars] = useState(0);
   const [error, setError] = useState('');
   const [running, setRunning] = useState(false);
@@ -149,9 +154,9 @@ export default function App() {
     void loadCloudflareHistory(true);
   }, []);
   const feePreview = useMemo(() => {
-    try { return { plan: planCommissions(code, fees), error: '' }; }
+    try { return { plan: planExecutionCosts(code, fees, contract.pointvalue, contract.mintick), error: '' }; }
     catch (e) { return { plan: null, error: e instanceof Error ? e.message : 'Invalid strategy commission setup.' }; }
-  }, [code, fees]);
+  }, [code, fees, contract.pointvalue, contract.mintick]);
   const interval = useMemo(() => inferIntervalMinutes(bars), [bars]);
   const coverage = useMemo(() => getHistoryCoverage(bars), [bars]);
   const coverageIssue = useMemo(() => checkRequestedCoverage(bars, start, end), [bars, start, end]);
@@ -161,7 +166,7 @@ export default function App() {
     try { return resampleCandles(bars.filter(b => b.time >= from && b.time < to), tf); } catch { return []; }
   }, [bars, start, end, tf]);
   const stop = () => { workerRef.current?.terminate(); workerRef.current = null; setRunning(false); };
-  const reset = () => { historyRequestSeq.current++; stop(); setFees({ ...DEFAULT_FEES }); setDataSource('demo'); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
+  const reset = () => { historyRequestSeq.current++; stop(); setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } }); setDataSource('demo'); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
   function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' = 'csv') {
     stop();
     setBars(next);
@@ -369,9 +374,10 @@ export default function App() {
               <Metric label="Profit factor" value={results ? results.profitFactor === null ? 'N/A' : num(results.profitFactor) : '—'} caption="Gross profit / gross loss"/>
               <Metric label="Max drawdown" value={results ? money(results.maxDrawdown) : '—'} caption="PineTS reported drawdown"/>
               <Metric label="Commissions" value={results ? money(results.fees.closedTradeCommissions + results.fees.openTradeEntryCommissions) : '—'}
-                caption={results ? (results.fees.source === 'pine' ? 'Pine Script fees' : num(results.fees.configuredRatePercent ?? 0, 3) + '% per execution') : 'Entry and exit fees'}/>
+                caption={results ? (results.fees.source === 'bybit' ? 'Bybit CFD cost mode' : results.fees.source === 'pine' ? 'Pine Script fees' : num(results.fees.configuredRatePercent ?? 0, 3) + '% per execution') : 'Entry and exit fees'}/>
             </div>
 
+            {results?.fees.bybit && <BybitResultsPanel results={results}/>}
             <section className="panel equity-panel"><div className="panel-head"><div><small>ACCOUNT PERFORMANCE</small><h2>Realized equity curve</h2></div>{results && <strong className={results.netProfit >= 0 ? 'positive' : 'negative'}>{money(results.initialCapital + results.netProfit)}</strong>}</div><EquityChart results={results}/><div className="panel-foot"><span>Closed-trade P&L only</span><span>{results ? 'Starting capital ' + money(results.initialCapital) : 'Awaiting results'}</span></div></section>
 
             {results ? <BacktestAnalysis key={results.periodStart + ':' + results.periodEnd + ':' + results.trades.length}
@@ -404,7 +410,9 @@ export default function App() {
               <label>Minimum qty/step <input type="number" min="0.000001" step="any" value={contract.mincontract} onChange={e => { setContract(v => ({ ...v, mincontract: Number(e.target.value) })); setResults(null); }}/></label>
               <label>Price tick size <input type="number" min="0.000001" step="any" value={contract.mintick} onChange={e => { setContract(v => ({ ...v, mintick: Number(e.target.value) })); setResults(null); }}/></label>
               </div></details>
-              <details className="commission-settings" open>
+              <BybitSettingsPanel settings={fees.bybit ?? DEFAULT_BYBIT} preview={feePreview.plan}
+                error={feePreview.error} contract={contract} onChange={updateBybit}/>
+              {!fees.bybit?.enabled && <details className="commission-settings" open>
                 <summary>Binance futures commissions <span>Default 0.05% per execution, opening and closing</span></summary>
                 <div className="commission-rate-row">
                   <label htmlFor="fee-rate">Commission per execution (%)</label>
@@ -429,7 +437,7 @@ export default function App() {
                   </div>
                 </div>
                 <p className="commission-caveat">Fees are calculated from executed position notional on both entry and exit; rates may differ for Binance maker/taker, VIP level and discounts. Funding is not included. This XAUUSD backtest is not an actual Binance gold instrument.</p>
-              </details>
+              </details>}
               <button className="btn run" disabled={running || fetchingHistory || Boolean(coverageIssue) || Boolean(feePreview.error)} onClick={run}>{running ? <span className="spinner"/> : <Play size={17} fill="currentColor"/>}{running ? 'Running strategy…' : 'Run Backtest'}<ArrowRight size={17}/></button>
               {running && <button className="text-button cancel" onClick={() => { stop(); setError('Backtest cancelled.'); }}>Cancel run</button>}
               <div className="help-note"><Info size={15}/> Calculations run in your browser. Your CSV and Pine source are not uploaded.</div>

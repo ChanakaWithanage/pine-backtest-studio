@@ -104,6 +104,34 @@ A five-year XAUUSD m15 CSV commonly includes around 120,000–130,000 session ca
 
 
 
+
+## Bybit TradFi Gold CFD cost simulation
+
+In **Backtest setup → Bybit TradFi Gold CFD**, enable the model and choose an account. This models **Bybit CFD**, not TradFi perpetual futures, using the available imported OHLCV feed (not live Bybit CFD quotes).
+
+| Parameter | Zero-Fee account | Tight-Spread account |
+| --- | --- | --- |
+| Additional commission | $0; incorporated in spread | $6 per standard metal lot for a complete trade |
+| Starting full spread assumption | $0.50 per gold ounce | $0.20 per gold ounce |
+| Spread certainty | **Hypothetical, editable; not an actual quoted Bybit spread** | **Hypothetical, editable; not an actual quoted Bybit spread** |
+| Standard gold lot | 100 oz assumed, editable | 100 oz assumed, editable |
+| Swap | Optional custom USD per lot per UTC rollover; starts at 0 | Optional custom USD per lot per UTC rollover; starts at 0 |
+
+Sources: [Bybit CFD fees](https://www.bybit.com/en/help-center/article/Bybit-CFD-Fees-Explained) and [Bybit account modes](https://www.bybit.com/en/help-center/article/Introduction-to-CFD).
+
+### Calculation and accounting
+
+- **Never double-charge:** When Bybit mode is on, the app replaces commission_type, commission_value and slippage in a runtime-only copy of the Pine strategy. Original source stays unchanged and Binance and Pine costs are not stacked. There is no need to edit the strategy manually.
+- **Commission:** In Tight-Spread the $6 per 100 oz corresponds to $0.06 per oz *round trip*. Bybit collects the commission on position opening. PineTS can apply identical commissions to every fill, so the same **round-trip total** is modeled as $3 per 100 oz upon opening and another $3 per 100 oz upon closing. The closed-trade total is correct under the assumed lot size, but fee timing while a trade is open differs.
+- **Spread:** The user enters a *full* spread in USD per gold ounce. The runner applies half against the entry and half against the exit through adverse PineTS slippage ticks, **rounded up** to a price-tick increment. Example: a $0.20/oz full spread, with a $0.01 tick, means 10 adverse ticks per execution. It is embedded in the fill prices and never separately subtracted from net profit. The cost breakdown includes an **estimated embedded spread** computed as quantity × pointvalue × modeled full spread.
+- **Swap:** Optional USD per lot per crossed UTC midnight. When nonzero, this is deducted from each closed trade after the engine run and updates net profit, profit factor, streaks, equity curve and period P&L. Because swap is post-processed, order sizing and the PineTS strategy maximum-drawdown value do not include it. Actual Bybit swap depends on long/short side, Bybit server rollover time, contract rates and triple-swap schedules, so 0 means **unknown/not modeled**, not proof of no funding cost.
+- **Quantity:** Modeled ounces = absolute strategy trade quantity × instrument pointvalue. Contract pointvalue, minimum quantity and tick size must match the user's intended contract; the app does not apply broker-specific CFD minimum lot increments.
+- **Result breakdown:** Commission is native PineTS order-fill commission; estimated spread is already in the fills; optional swap is separately deducted. Reported trade P&L, win rate, profit factor, overall net profit, realized equity, weekly/monthly analytics, Sharpe and Sortino reflect the selected model. Trades can change between fee modes because the strategy sizes orders using account equity.
+
+### Accuracy limits
+
+The displayed $0.50/$0.20 example spreads are **not historical Bybit observations or guaranteed live spreads**. A constant adverse-slippage approximation does not reproduce real bid/ask history, liquidity, stop/limit triggers, MT5 order execution, broker lot constraints, spreads around session boundaries or broker-specific mark-to-market. Use live Bybit quotes to set realistic assumptions.
+
 ## Binance-style futures commission settings
 
 Binance regular-account USDⓈ-M futures **taker** commission is **0.05% of executed notional per fill**, charged when opening **and** again when closing. The regular-account **maker** commission is typically 0.02%; exact costs depend on contract, account VIP tier, BNB discounts, liquidity provision, region and promotions. [Binance futures fee calculations](https://www.binance.com/en/support/faq/detail/360033544231) · [Binance fee schedule](https://www.binance.com/en/fee/futureFee)

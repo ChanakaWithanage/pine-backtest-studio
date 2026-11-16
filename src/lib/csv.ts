@@ -126,11 +126,11 @@ function escapeCsv(value: string | number): string {
 }
 
 export function exportTrades(trades: Trade[]): string {
-  const rows = [['id', 'direction', 'entry_utc', 'exit_utc', 'entry_price', 'exit_price', 'size', 'net_profit', 'commission']];
+  const rows = [['id', 'direction', 'entry_utc', 'exit_utc', 'entry_price', 'exit_price', 'size', 'net_profit', 'commission', 'estimated_spread_embedded', 'estimated_swap_deducted']];
   for (const trade of trades) {
     rows.push([trade.id, trade.direction, new Date(trade.entryTime).toISOString(),
       new Date(trade.exitTime).toISOString(), String(trade.entryPrice),
-      String(trade.exitPrice), String(trade.size), String(trade.profit), String(trade.commission)]);
+      String(trade.exitPrice), String(trade.size), String(trade.profit), String(trade.commission), String(trade.spreadCostEstimate ?? 0), String(trade.swapCostEstimate ?? 0)]);
   }
   return rows.map(r => r.map(escapeCsv).join(',')).join('\n') + '\n';
 }

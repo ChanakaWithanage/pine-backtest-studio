@@ -1,4 +1,4 @@
-import type { FeeSettings } from './lib/commissions';
+import type { FeeSettings, BybitPlan } from './lib/commissions';
 export interface Candle {
   time: number; // Unix milliseconds at candle open (UTC)
   open: number;
@@ -27,12 +27,16 @@ export interface Trade {
   size: number;
   profit: number;
   commission: number;
+  /** Approximate embedded spread cost (already reflected in PineTS fill prices). */
+  spreadCostEstimate?: number;
+  /** Optional modeled swap, deducted after PineTS executes the strategy. */
+  swapCostEstimate?: number;
 }
 
 export interface EquityPoint { time: number; value: number; }
 
 export interface FeeSummary {
-  source: 'pine' | 'app';
+  source: 'pine' | 'app' | 'bybit';
   overridden: boolean;
   configuredRatePercent: number | null;
   actualType: string;
@@ -41,6 +45,12 @@ export interface FeeSummary {
   openTradeEntryCommissions: number;
   description: string;
   pineDeclaration: string;
+  bybit?: BybitPlan & {
+    closedSpreadCostEstimate: number;
+    openSpreadCostEstimate: number;
+    swapCostEstimate: number;
+    totalCostEstimate: number;
+  };
 }
 
 export interface Results {
