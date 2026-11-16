@@ -3,10 +3,10 @@ import { strict as assert } from 'node:assert';
 import { PineTS } from 'pinets';
 import { runBacktest } from '../src/lib/backtest.ts';
 import { buildCsvPineProvider } from '../src/lib/csv-provider.ts';
-import { createDemoCandles, EXAMPLE_SCRIPT } from '../src/lib/demo.ts';
+import { createDemoCandles, EMA_TEST_SCRIPT } from '../src/lib/demo.ts';
 
 test('PineTS executes native Pine v6 EMA strategy and generates trades', { timeout: 60_000 }, async () => {
-  const r = await runBacktest(EXAMPLE_SCRIPT, createDemoCandles().slice(0, 500));
+  const r = await runBacktest(EMA_TEST_SCRIPT, createDemoCandles().slice(0, 500));
   assert.ok(Number.isFinite(r.netProfit));
   assert.ok(r.trades.length > 0, 'EMA sample must generate closed trades');
   assert.ok(r.winRate >= 0 && r.winRate <= 100);
@@ -48,7 +48,7 @@ test('rejects indicator-only scripts', async () => {
 });
 
 test('rejects invalid gold contract metadata', async () => {
-  await assert.rejects(() => runBacktest(EXAMPLE_SCRIPT, createDemoCandles().slice(0, 50), {
+  await assert.rejects(() => runBacktest(EMA_TEST_SCRIPT, createDemoCandles().slice(0, 50), {
     pointvalue: 0, mincontract: 1, mintick: 0.01
   }), /pointvalue/);
 });

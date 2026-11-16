@@ -1,6 +1,7 @@
+import GoldBreakoutSource from '../../samples/gold-breakout-15m.pine?raw';
 import type { Candle } from '../types';
 
-export const EXAMPLE_SCRIPT = [
+export const EMA_TEST_SCRIPT = [
   '//@version=6',
   'strategy("EMA Crossover • Example", overlay=true, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0.02)',
   'fast = ta.ema(close, 12)',
@@ -12,6 +13,8 @@ export const EXAMPLE_SCRIPT = [
   'if ta.crossunder(fast, slow)',
   '    strategy.entry("Short", strategy.short)'
 ].join('\n');
+
+export const EXAMPLE_SCRIPT = GoldBreakoutSource;
 
 export function createDemoCandles(): Candle[] {
   // An entirely synthetic dataset for UI testing; NEVER present as real XAUUSD history.

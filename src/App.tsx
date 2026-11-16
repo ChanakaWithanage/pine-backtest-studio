@@ -111,7 +111,7 @@ export default function App() {
   const [name, setName] = useState('Synthetic sample');
   const [demo, setDemo] = useState(true);
   const [code, setCode] = useState(EXAMPLE_SCRIPT);
-  const [scriptName, setScriptName] = useState('ema-crossover.pine');
+  const [scriptName, setScriptName] = useState('gold-breakout-15m.pine');
   const [tf, setTf] = useState(15);
   const [chartView, setChartView] = useState<'backtest' | 'reference'>('backtest');
   const [fetchingHistory, setFetchingHistory] = useState(false);
