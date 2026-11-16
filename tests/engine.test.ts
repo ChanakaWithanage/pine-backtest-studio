@@ -21,3 +21,28 @@ test('PineTS executes a native v6 strategy against custom OHLCV candles', { time
 test('rejects indicator scripts that contain no strategy declaration', async () => {
   await assert.rejects(() => runBacktest('//@version=6\nindicator("No trades")', createDemoCandles()), /strategy/);
 });
+
+test('gold-style session and risk sizing receive valid timestamp and symbol metadata', { timeout: 60_000 }, async () => {
+  const candles = createDemoCandles().slice(0, 250);
+  const script = `//@version=6
+strategy("Metadata Smoke Test", initial_capital=10000)
+var float observedClose = na
+if bar_index == 1
+    observedClose := time_close - time
+    strategy.entry("Meta", strategy.long, qty = math.floor(200 / (close * 0.01 * syminfo.pointvalue) / syminfo.mincontract) * syminfo.mincontract)
+if bar_index == 4
+    strategy.close("Meta")
+plot(observedClose, "bar_duration")
+`;
+  const r = await runBacktest(script, candles, { pointvalue: 1, mincontract: 0.01, mintick: 0.01 });
+  assert.equal(r.trades.length, 1, 'known strategy must close a risk-sized order');
+  assert.ok(r.trades[0].size > 0);
+});
+
+test('rejects invalid gold contract metadata', async () => {
+  const candles = createDemoCandles().slice(0, 50);
+  await assert.rejects(
+    () => runBacktest(EXAMPLE_SCRIPT, candles, { pointvalue: 0, mincontract: 1, mintick: 0.01 }),
+    /pointvalue/
+  );
+});

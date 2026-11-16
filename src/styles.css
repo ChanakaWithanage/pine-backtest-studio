@@ -110,3 +110,32 @@ footer{display:flex;justify-content:space-between;gap:15px;padding:29px 0 4px;co
 @media(max-width:1350px){.workgrid{grid-template-columns:minmax(0,1fr) 318px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.data-strip{gap:13px}.strip-item{padding-left:14px}}
 @media(max-width:1050px){.workgrid{grid-template-columns:1fr}.rightcol{display:grid;grid-template-columns:1fr 1fr;align-items:start}.rightcol>.error,.rightcol>.success,.rightcol>.help-card{grid-column:1/-1}.data-strip .btn{margin-left:auto}}
 @media(max-width:740px){.rail{display:none}.topbar{padding:0 17px;height:65px}.main{padding:23px 15px}.header-right .local{display:none}.brand small{display:none}.headline{align-items:start}.headline .secondary{font-size:0;padding:10px}.headline .secondary svg{width:17px;height:17px}.headline h1{font-size:32px}.data-strip{padding:14px;gap:15px}.instrument{min-width:100%;flex:auto}.strip-item{min-width:80px;padding-left:9px}.data-strip .btn{width:100%}.rightcol{display:flex}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.metric{padding:15px 12px}.metric-value{font-size:22px}.chart-panel .panel-head,.panel-head{padding:15px}.legend{display:none}.section-heading h2{font-size:18px}.status{font-size:8px}.panel-foot{font-size:9px}.price-chart{height:300px}footer{font-size:9px}}
+
+
+/* GOLD reference chart and deterministic instrument metadata controls */
+.chart-source-tabs{display:inline-flex;align-items:center;gap:4px;background:#0d1723;border:1px solid #2d4256;padding:4px;border-radius:8px}
+.chart-source-tabs button{border:0;background:transparent;padding:8px 11px;border-radius:6px;color:#87a0b7;font-size:11px;font-weight:700;white-space:nowrap}
+.chart-source-tabs button:hover{color:#d6f8ec}
+.chart-source-tabs button.selected{background:#224436;color:#56e3be}
+.tv-gold-embed{height:410px;width:100%;background:#111b29}
+.reference-note{padding:11px 17px;border-top:1px solid #25374a;display:flex;gap:9px;align-items:flex-start;color:#c9a56d;background:#282a29;font-size:11px;line-height:1.6}
+.reference-note svg{flex:none;margin-top:1px}
+.chart-panel .panel-foot a{color:#5bdcc2;display:flex;align-items:center;gap:5px}
+.contract-settings{margin:0 19px 16px;padding:12px;background:#111e2b;border:1px solid #30455a;border-radius:8px}
+.contract-settings summary{cursor:pointer;font-weight:700;font-size:11px;color:#d1e9e3}
+.contract-settings summary span{display:block;font-size:10px;font-weight:500;color:#8ca4b3;margin-top:5px}
+.contract-settings p{color:#90a5b7;font-size:10px;line-height:1.6;margin:12px 0}
+.contract-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.contract-fields label{display:flex;flex-direction:column;font-size:10px;color:#a9c1d0;gap:5px}
+.contract-fields input{width:100%;min-width:0;background:#172438;color:#e7f4f2;border:1px solid #38495b;padding:8px 9px;border-radius:6px;font-size:12px}
+.contract-fields input:focus{outline:1px solid #4ddfc0}
+.zero-diagnostics{padding:17px 18px;border:1px solid #6b5439;background:#302719;border-radius:10px;color:#f1cb94}
+.zero-title{display:flex;align-items:center;gap:10px;font-size:13px}
+.zero-diagnostics p{font-size:11px;line-height:1.6;margin:11px 0;color:#d5b991}
+.zero-diagnostics ul{list-style:disc;margin:10px 0 0;padding-left:17px;display:flex;flex-direction:column;gap:8px}
+.zero-diagnostics li{color:#ead0ac;font-size:11px;line-height:1.55}
+.zero-success{display:flex;gap:11px;padding:17px 15px;background:#263042;border:1px solid #51607a;border-radius:10px;color:#adbbd2}
+.zero-success svg{flex:none}
+.zero-success strong{font-size:12px}
+.zero-success p{font-size:11px;margin:7px 0 0;color:#9aaec0}
+@media(max-width:620px){.chart-source-tabs button{padding:8px;font-size:10px}.chart-panel>.panel-head{align-items:start;flex-direction:column}.tv-gold-embed{height:340px}}

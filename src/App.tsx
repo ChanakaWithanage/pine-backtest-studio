@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, BarChart3, Check, ChevronRight, CircleAlert, Clock3, Code2, Download, FileCode2, FileDown, FolderOpen, Github, Info, Layers3, Play, RotateCcw, Settings2, ShieldCheck, UploadCloud } from 'lucide-react';
 import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, type UTCTimestamp } from 'lightweight-charts';
 import { createDemoCandles, EXAMPLE_SCRIPT } from './lib/demo';
+import { DEFAULT_CONTRACT } from './lib/csv-provider';
 import { exportTrades, inferIntervalMinutes, parseCsv, resampleCandles } from './lib/csv';
-import type { Candle, Results, Trade, WorkerResponse } from './types';
+import type { Candle, Results, Trade, ContractSettings, WorkerResponse } from './types';
 
 const REPO = 'https://github.com/ChanakaWithanage/pine-backtest-studio';
 const OPTIONS = [{ value: 3, label: '3 minutes' }, { value: 5, label: '5 minutes' }, { value: 15, label: '15 minutes' }, { value: 30, label: '30 minutes' }, { value: 60, label: '1 hour' }, { value: 240, label: '4 hours' }];
@@ -48,6 +49,42 @@ function PriceChart({ bars, trades }: { bars: Candle[]; trades: Trade[] }) {
   return <div className="price-chart" ref={ref} aria-label="Price chart with entry and exit markers" />;
 }
 
+/**
+ * Official TradingView chart embed. It has NO programmatic candle/strategy data
+ * interface. Keep it isolated from the CSV price series and the PineTS engine.
+ */
+function GoldReferenceChart({ timeframe }: { timeframe: number }) {
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = host.current;
+    if (!node) return;
+    const inner = document.createElement('div');
+    inner.className = 'tradingview-widget-container__widget';
+    inner.style.height = '100%';
+    inner.style.width = '100%';
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.type = 'text/javascript';
+    script.async = true;
+    script.textContent = JSON.stringify({
+      autosize: true,
+      symbol: 'TVC:GOLD',
+      interval: String(timeframe),
+      timezone: 'Etc/UTC',
+      theme: 'dark',
+      style: '1',
+      locale: 'en',
+      withdateranges: true,
+      allow_symbol_change: false,
+      save_image: false,
+      support_host: 'https://www.tradingview.com'
+    });
+    node.replaceChildren(inner, script);
+    return () => node.replaceChildren();
+  }, [timeframe]);
+  return <div ref={host} className="tv-gold-embed tradingview-widget-container" aria-label="TradingView TVC:GOLD reference chart" />;
+}
+
 function EquityChart({ results }: { results: Results | null }) {
   if (!results || results.equity.length < 2) return <div className="empty-equity"><BarChart3 size={25}/>{results ? 'No closed trades in this period' : 'Run a strategy to display the equity curve'}</div>;
   const values = results.equity.map(p => p.value);
@@ -74,6 +111,8 @@ export default function App() {
   const [code, setCode] = useState(EXAMPLE_SCRIPT);
   const [scriptName, setScriptName] = useState('ema-crossover.pine');
   const [tf, setTf] = useState(15);
+  const [chartView, setChartView] = useState<'backtest' | 'reference'>('backtest');
+  const [contract, setContract] = useState<ContractSettings>({ ...DEFAULT_CONTRACT });
   const [start, setStart] = useState(day(DEMO[0].time));
   const [end, setEnd] = useState(day(DEMO[DEMO.length - 1].time));
   const [results, setResults] = useState<Results | null>(null);
@@ -95,7 +134,7 @@ export default function App() {
     try { return resampleCandles(bars.filter(b => b.time >= from && b.time < to), tf); } catch { return []; }
   }, [bars, start, end, tf]);
   const stop = () => { workerRef.current?.terminate(); workerRef.current = null; setRunning(false); };
-  const reset = () => { stop(); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
+  const reset = () => { stop(); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
   async function importCsv(file?: File) {
     if (!file) return;
     try {
@@ -135,7 +174,7 @@ export default function App() {
       worker.terminate(); workerRef.current = null;
     };
     worker.onerror = () => { setRunning(false); setError('Backtesting worker failed. Check the browser console.'); worker.terminate(); workerRef.current = null; };
-    worker.postMessage({ id, code, candles: data });
+    worker.postMessage({ id, code, candles: data, contract });
   }
 
   return <div className="app">
@@ -157,7 +196,10 @@ export default function App() {
 
         <div className="workgrid">
           <div className="leftcol">
-            <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ XAUUSD</span></h2></div><div className="legend"><i className="bull"/> Bullish <i className="bear"/> Bearish</div></div><div className="chart-bar"><strong>XAUUSD · {tf}m</strong><span>{demo ? 'DEMO DATA' : 'IMPORTED'}</span></div><PriceChart bars={selection.length ? selection : bars} trades={results?.trades || []}/><div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></section>
+            <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ Gold</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button><button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button></div></div>
+              {chartView === 'backtest' ? <><div className="chart-bar"><strong>CSV:XAUUSD · {tf}m</strong><span>{demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div><PriceChart bars={selection.length ? selection : bars} trades={results?.trades || []}/><div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
+              : <><div className="chart-bar"><strong>TradingView · TVC:GOLD · {tf}m</strong><span>REFERENCE ONLY</span></div><GoldReferenceChart timeframe={tf}/><div className="reference-note"><Info size={15}/> TradingView provides this display-only chart. The candles are not accessible to PineTS. Backtesting uses the separately imported CSV data, never this widget.</div><div className="panel-foot"><a href="https://www.tradingview.com/symbols/TVC-GOLD/" target="_blank" rel="noreferrer">Open TVC:GOLD on TradingView <ArrowUpRight size={13}/></a><span>Data and strategy results are not synchronized</span></div></>}
+            </section>
 
             <div className="section-heading"><div><small>PERFORMANCE</small><h2>Strategy results</h2></div><span className={'status ' + (results ? 'ready' : '')}>{results ? <Check size={14}/> : <span className="status-ring"/>}{results ? 'BACKTEST COMPLETE' : 'AWAITING BACKTEST'}</span></div>
             <div className="metrics">
@@ -178,10 +220,16 @@ export default function App() {
 
           <div className="rightcol" id="editor">
             <section className="panel settings-panel"><div className="panel-head"><div><small>CONFIGURATION</small><h2>Backtest setup</h2></div><Settings2 size={18}/></div>
-              <label>Market symbol</label><div className="locked-field"><span className="mini-au">Au</span><strong>XAUUSD</strong><span>Imported feed</span></div>
+              <label>Backtest data source</label><div className="locked-field"><span className="mini-au">Au</span><strong>CSV:XAUUSD</strong><span>Not TVC:GOLD</span></div>
               <label htmlFor="tf">Timeframe</label><select id="tf" value={tf} onChange={e => { setTf(Number(e.target.value)); setResults(null); }}>{OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
               <label>Date range <span>UTC / inclusive</span></label><div className="dates"><input type="date" aria-label="Start date" value={start} onChange={e => { setStart(e.target.value); setResults(null); }}/><input type="date" aria-label="End date" value={end} onChange={e => { setEnd(e.target.value); setResults(null); }}/></div>
               <div className="bar-count"><ShieldCheck size={14}/>{selection.length.toLocaleString()} complete bars selected</div>
+              <details className="contract-settings" open><summary>Gold contract settings <span>Required for risk sizing</span></summary><p>These are simulation assumptions, not verified TVC:GOLD contract specifications. Match your broker/instrument before comparing P&L.</p>
+              <div className="contract-fields">
+              <label>Point value <input type="number" min="0.000001" step="any" value={contract.pointvalue} onChange={e => { setContract(v => ({ ...v, pointvalue: Number(e.target.value) })); setResults(null); }}/></label>
+              <label>Minimum qty/step <input type="number" min="0.000001" step="any" value={contract.mincontract} onChange={e => { setContract(v => ({ ...v, mincontract: Number(e.target.value) })); setResults(null); }}/></label>
+              <label>Price tick size <input type="number" min="0.000001" step="any" value={contract.mintick} onChange={e => { setContract(v => ({ ...v, mintick: Number(e.target.value) })); setResults(null); }}/></label>
+              </div></details>
               <button className="btn run" disabled={running} onClick={run}>{running ? <span className="spinner"/> : <Play size={17} fill="currentColor"/>}{running ? 'Running strategy…' : 'Run Backtest'}<ArrowRight size={17}/></button>
               {running && <button className="text-button cancel" onClick={() => { stop(); setError('Backtest cancelled.'); }}>Cancel run</button>}
               <div className="help-note"><Info size={15}/> Calculations run in your browser. Your CSV and Pine source are not uploaded.</div>
@@ -191,7 +239,8 @@ export default function App() {
                 : <div className="guide"><h3>Get 3 years of gold</h3><p>Use the included Node.js downloader to create an XAUUSD CSV, then click Import CSV.</p><span>TERMINAL</span><pre>npm run download:gold -- 2023-11-16 2026-11-16 m15</pre><p>Data appears in <code>data/</code>. A 15m file cannot produce genuine 3m bars; download m1 data for that.</p><a href={REPO + '#historical-gold-data'} target="_blank" rel="noreferrer">View setup guide <ArrowUpRight size={14}/></a></div>}
             </section>
             {error && <div className="error" role="alert"><CircleAlert size={20}/><div><strong>Backtest needs attention</strong><p>{error}</p></div><button onClick={() => setError('')}>×</button></div>}
-            {results && <div className="success"><Check size={18}/><div><strong>Backtest completed</strong><p>{usedBars.toLocaleString()} bars · {results.trades.length} closed trades · {results.openTrades} open</p></div></div>}
+            {results && results.trades.length === 0 && <section className="zero-diagnostics" role="status"><div className="zero-title"><CircleAlert size={19}/><strong>0 closed trades · diagnostic report</strong></div><p>The engine ran, but did not report closed orders. These checks help distinguish missing price breakouts from unsupported Pine behavior.</p><ul>{results.warnings.slice(0, 6).map((hint, i) => <li key={i}>{hint}</li>)}</ul></section>}
+            {results && <div className={results.trades.length ? 'success' : 'zero-success'}><Check size={18}/><div><strong>Calculation finished{results.trades.length ? '' : ' (no closed trades)'}</strong><p>{usedBars.toLocaleString()} bars · {results.trades.length} closed · {results.openTrades} open · {results.pendingOrders} pending</p></div></div>}
             <div className="help-card"><div><Info size={17}/><strong>Research, not execution</strong></div><p>Different gold feeds, tick sizes, spreads and intrabar fills may change results. Validate against a trusted reference before trading.</p><a href={REPO + '#limitations'} target="_blank" rel="noreferrer">Read limitations <ArrowUpRight size={14}/></a></div>
           </div>
         </div>

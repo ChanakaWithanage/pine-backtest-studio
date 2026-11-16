@@ -114,3 +114,28 @@ tests/
 The app is licensed under **GNU AGPL-3.0-only** because it links to [PineTS](https://github.com/LuxAlgo/PineTS), whose AGPL terms apply unless you obtain a separate commercial license. Read LICENSE. TradingView® / Pine Script® marks belong to TradingView, Inc.; this is an independent project.
 
 Contributions and reproducible test cases are welcome.
+
+
+## TVC:GOLD reference chart and 0-trade diagnostics
+
+The **TVC:GOLD** tab embeds TradingView's official display-only chart. It is a visual reference, not the price source used in PineTS strategy backtests. TradingView's widget does not expose historical OHLCV for download or third-party strategy evaluation; it also cannot run user-uploaded Pine scripts inside the embed. TradingView's terms restrict non-display reuse of its chart data.
+
+The **Backtest data** tab displays the user's imported OHLCV/CSV (or clearly labeled synthetic demonstration candles). PineTS executes on that dataset only. Backtest chart, trade markers, and CSV trade export all refer to the same imported source. The two charts do **not** synchronize or share price series.
+
+### Why did Gold Breakout return 0 trades?
+
+The original app passed only anonymous OHLCV bars. PineTS could not infer syminfo.pointvalue, syminfo.mincontract, or the exact timeframe. The uploaded Gold Breakout 15M strategy uses all three to calculate risk-based quantity and overnight session windows. This could silently produce invalid/no orders.
+
+The runner now supplies explicit closeTime for each candle and passes the selected interval to PineTS, with an in-memory provider that supplies configurable gold contract metadata.
+
+The **Gold contract settings** panel lets you set:
+
+- **Point value:** monetary value of a one-point price move per strategy contract (example research default: 1).
+- **Minimum qty/step:** minimum allowed contract quantity (example research default: 0.01).
+- **Price tick size:** minimum tradable price increment (example research default: 0.01).
+
+Defaults are **not verified specifications** for TVC:GOLD, your broker's XAUUSD instrument, COMEX gold futures, or Binance PAXGUSDT. Determine correct values for your instrument before interpreting P&L or risking money.
+
+If a script returns zero closed trades, the app now displays pending/open order counts and diagnostic hints, including a *simplified* overnight-session sanity check for the default Gold Breakout script. These hints do not replace actual broker-emulator execution or confirm TradingView parity. Scripts with many advanced Pine features, drawings, or third-party imports may remain incompatible with PineTS.
+
+The project does not ship proprietary TradingView data or the user's full 1,181-line strategy code. Import your own Pine file when testing.
