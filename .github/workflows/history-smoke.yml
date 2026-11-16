@@ -1,0 +1,26 @@
+name: XAUUSD history provider smoke test
+on:
+  push:
+    paths:
+      - 'scripts/prepare-hosted-history.mjs'
+      - '.github/workflows/history-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Download a few real XAUUSD BID candles
+        env:
+          GOLD_HISTORY_BUILD: '1'
+          GOLD_HISTORY_SMOKE: '1'
+          GOLD_HISTORY_VERBOSE: '1'
+        run: node scripts/prepare-hosted-history.mjs
+      - name: Validate sample manifest
+        run: node -e "const m=require('./public/history/manifest.json');if(!m.candleCount||!m.files.length)process.exit(1);console.log(m.provider,m.instrument,m.candleCount,'candles')"

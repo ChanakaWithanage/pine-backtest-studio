@@ -100,6 +100,30 @@ Dukascopy permits historical data export for research, but its general site term
 
 A five-year XAUUSD m15 CSV commonly includes around 120,000–130,000 session candles. The data import supports this size, but full PineTS execution speed and memory usage depend on the complexity of the script and browser hardware. Start by verifying a one-year overlapping period against TradingView, and increase to five years after checking correct data coverage, session timezone, and strategy order size. There is no 19-trade cap in the software.
 
+
+
+## Cloudflare data build: no cloning or terminal required
+
+When this project deploys through Git integration to Cloudflare Pages, npm's prebuild hook automatically requests five calendar years of Dukascopy **XAUUSD BID 15-minute candles**. The current date is used for the rolling range (for example, Nov 2021–Nov 2026). The downloader creates yearly CSV chunks and a manifest in the temporary Cloudflare build directory. Vite publishes them with the site, **without adding price data to the public GitHub repository**.
+
+The browser automatically reads /history/manifest.json, validates the reported counts/timestamps for each yearly file, combines them, and selects the full available range. If auto-loading fails, click **Load 5 years XAUUSD** to retry. Never confuse this source with TradingView TVC:GOLD; the latter is display-only.
+
+**Default Pine strategy:** The actual *Gold Breakout 15M Strategy v1.1.0* from the project's published source file (samples/gold-breakout-15m.pine). The former EMA strategy is retained only as a unit-test fixture. PineTS does not guarantee compatibility with every Pine Script feature, so a five-year backtest still needs verification.
+
+### Privacy and provider terms
+
+This is intended for the owner's personal research. Cloudflare Pages assets are publicly accessible **unless you protect the site**. Before enabling a personal-use data feed on an Internet-hosted site, configure [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/self-hosted-apps/) to restrict access to your identity. The GitHub repository being public or private does not by itself restrict the deployed website.
+
+Dukascopy's [website terms](https://www.dukascopy.com/swiss/english/legal-pages/terms-of-use/) allow personal non-commercial downloads but restrict distribution and publication without permission. The site operator must confirm permitted hosting/processing and protect the deployment accordingly. No data is permanently included in git.
+
+### Cloudflare build-time limitation
+
+Cloudflare Pages' build limit is **20 minutes**. Five years requires substantial requests and may fail because of timeout, a provider 403/WAF response, or rate limiting. If fetching fails, this build fails instead of pretending that synthetic data is a real five-year backtest; a previously deployed app remains available. The script logs each yearly download, verifies timestamps and candle counts, and rejects incomplete results (under 90,000 15m candles).
+
+In a normal local/GitHub CI build without CF_PAGES=1, this expensive download is skipped. To test the downloader explicitly, set GOLD_HISTORY_SMOKE=1 and GOLD_HISTORY_BUILD=1 in a CI job. Static assets are limited to 25 MiB each; the dataset is split by calendar year.
+
+For continuing daily data, Cloudflare Pages rebuilds from GitHub when you push code; it does not automatically rebuild every market day. Consider an explicitly scheduled build trigger or an authorized real-time provider for ongoing updates.
+
 ## Run your own Pine strategy
 
 1. Choose **Import CSV files** for your real history, or use the synthetic demo only to test the interface.

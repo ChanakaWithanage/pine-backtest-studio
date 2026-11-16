@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, BarChart3, Check, ChevronRight, CircleAlert, Clock3, Code2, Download, FileCode2, FileDown, FolderOpen, Github, Info, Layers3, Play, RotateCcw, Settings2, ShieldCheck, UploadCloud } from 'lucide-react';
 import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, type UTCTimestamp } from 'lightweight-charts';
-import { createDemoCandles, EXAMPLE_SCRIPT } from './lib/demo';
+import { createDemoCandles } from './lib/demo';
+import GoldBreakoutSource from '../samples/gold-breakout-15m.pine?raw';
 import { DEFAULT_CONTRACT } from './lib/csv-provider';
+import { parseHostedManifest } from './lib/hosted';
 import { checkRequestedCoverage, getHistoryCoverage, mergeCandleBatches, pastYearsFromLastCandle } from './lib/history';
 import { exportTrades, inferIntervalMinutes, parseCsv, resampleCandles } from './lib/csv';
 import type { Candle, Results, Trade, ContractSettings, WorkerResponse } from './types';
@@ -110,12 +112,16 @@ export default function App() {
   const [bars, setBars] = useState<Candle[]>(DEMO);
   const [name, setName] = useState('Synthetic sample');
   const [demo, setDemo] = useState(true);
-  const [code, setCode] = useState(EXAMPLE_SCRIPT);
+  const [code, setCode] = useState(GoldBreakoutSource);
   const [scriptName, setScriptName] = useState('gold-breakout-15m.pine');
   const [tf, setTf] = useState(15);
   const [chartView, setChartView] = useState<'backtest' | 'reference'>('backtest');
   const [fetchingHistory, setFetchingHistory] = useState(false);
   const [importMessage, setImportMessage] = useState('');
+  const [loadingProgress, setLoadingProgress] = useState('');
+  const [dataSource, setDataSource] = useState<'demo' | 'csv' | 'dukascopy'>('demo');
+  const autoLoadStarted = useRef(false);
+  const historyRequestSeq = useRef(0);
   const csvModeRef = useRef<'replace' | 'append'>('replace');
   const [contract, setContract] = useState<ContractSettings>({ ...DEFAULT_CONTRACT });
   const [start, setStart] = useState(day(DEMO[0].time));
@@ -132,6 +138,13 @@ export default function App() {
   const idRef = useRef(0);
 
   useEffect(() => () => workerRef.current?.terminate(), []);
+  useEffect(() => {
+    // Cloudflare builds generate /history/manifest.json. When missing (e.g.
+    // local dev) the app stays in its clearly marked synthetic demo state.
+    if (autoLoadStarted.current) return;
+    autoLoadStarted.current = true;
+    void loadCloudflareHistory(true);
+  }, []);
   const interval = useMemo(() => inferIntervalMinutes(bars), [bars]);
   const coverage = useMemo(() => getHistoryCoverage(bars), [bars]);
   const coverageIssue = useMemo(() => checkRequestedCoverage(bars, start, end), [bars, start, end]);
@@ -141,12 +154,13 @@ export default function App() {
     try { return resampleCandles(bars.filter(b => b.time >= from && b.time < to), tf); } catch { return []; }
   }, [bars, start, end, tf]);
   const stop = () => { workerRef.current?.terminate(); workerRef.current = null; setRunning(false); };
-  const reset = () => { stop(); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
-  function applyHistory(next: Candle[], label: string) {
+  const reset = () => { historyRequestSeq.current++; stop(); setDataSource('demo'); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
+  function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' = 'csv') {
     stop();
     setBars(next);
     setDemo(false);
     setName(label);
+    setDataSource(source);
     const sourceInterval = inferIntervalMinutes(next);
     setTf(OPTIONS.some(option => option.value === sourceInterval) ? sourceInterval : 15);
     setStart(day(next[0].time));
@@ -162,6 +176,7 @@ export default function App() {
 
   async function importCsv(files?: FileList | null) {
     if (!files?.length) return;
+    historyRequestSeq.current++; // Cancel any in-flight automatic import.
     try {
       const selected = Array.from(files);
       if (selected.length > 20) throw new Error('Select at most 20 historical CSV files at once.');
@@ -182,6 +197,56 @@ export default function App() {
       setError(e instanceof Error ? e.message : 'Failed to load CSV history.');
     }
     if (csvRef.current) csvRef.current.value = '';
+  }
+
+  /**
+   * Load Cloudflare build-generated 5-year historical XAUUSD candles.
+   * Source is Dukascopy BID, never TradingView TVC:GOLD.
+   * All bars are validated before marking the dataset ready.
+   */
+  async function loadCloudflareHistory(auto = false) {
+    const seq = ++historyRequestSeq.current;
+    setLoadingProgress('Checking hosted XAUUSD history…');
+    try {
+      const res = await fetch('/history/manifest.json', { cache: 'no-cache' });
+      if (res.status === 404 && auto) {
+        setLoadingProgress('');
+        return;
+      }
+      if (!res.ok) throw new Error('Historical manifest unavailable (HTTP ' + res.status + ').');
+      const manifest = parseHostedManifest(await res.json());
+      setFetchingHistory(true);
+      const groups: Candle[][] = [];
+      for (let i = 0; i < manifest.files.length; i++) {
+        if (seq !== historyRequestSeq.current) return;
+        setLoadingProgress('Loading year ' + (i + 1) + ' of ' + manifest.files.length + '…');
+        const part = manifest.files[i];
+        const response = await fetch(part.file);
+        if (!response.ok) throw new Error('Failed to load ' + part.file + ' (HTTP ' + response.status + ').');
+        const text = await response.text();
+        if (text.length > 24 * 1024 * 1024) throw new Error('Hosted history segment is too large.');
+        const parsed = parseCsv(text);
+        if (parsed.length !== part.count ||
+            parsed[0].time !== part.first ||
+            parsed[parsed.length - 1].time !== part.last) {
+          throw new Error('Historical data validation failed for ' + part.file);
+        }
+        groups.push(parsed);
+      }
+      const merged = mergeCandleBatches(groups);
+      if (merged.length !== manifest.candleCount) throw new Error('Missing historical candles after merge.');
+      if (seq !== historyRequestSeq.current) return;
+      applyHistory(merged, 'Dukascopy XAUUSD · BID · 15m', 'dukascopy');
+      setLoadingProgress('');
+    } catch (e) {
+      if (seq === historyRequestSeq.current) {
+        setError('Unable to load five-year XAUUSD data: ' +
+          (e instanceof Error ? e.message : String(e)));
+        setLoadingProgress('');
+      }
+    } finally {
+      if (seq === historyRequestSeq.current) setFetchingHistory(false);
+    }
   }
 
   async function loadHostedHistory() {
@@ -253,15 +318,16 @@ export default function App() {
       <main className="main">
         <div className="breadcrumb">WORKSPACE <ChevronRight size={13}/> STRATEGY BACKTESTER</div>
         <div className="headline"><div><div className="eyebrow"><i/> EXTENDED HISTORY ENGINE</div><h1>Strategy Backtester<span>.</span></h1><p>Run Pine Script strategies on your own historical data, beyond chart history limits.</p></div><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset demo</button></div>
-        <div className="notice"><Info size={17}/><p><strong>Target: TradingView TVC:GOLD, 15 minutes, five years.</strong> Exact historical TVC:GOLD candles are not provided by this app. {demo ? 'The default demo is synthetic, not gold.' : 'The current CSV source cannot be verified as TVC:GOLD; results must not be described as TVC:GOLD backtests.'} TradingView permits display of its embedded chart but restricts non-display market data processing without authorization.</p></div>
+        <div className="notice"><Info size={17}/><p><strong>Default strategy: Gold Breakout 15M v1.1.0.</strong> {dataSource === 'dukascopy' ? 'Backtest candles: five-year Dukascopy XAUUSD BID (15m), not TradingView TVC:GOLD.' : dataSource === 'demo' ? 'Loading real gold candles where available. The temporary demo uses synthetic prices, not actual gold.' : 'Custom CSV imported: its source is not verified as TVC:GOLD.'} The TVC:GOLD chart is a reference only; different gold feeds may produce different trade results.</p></div>
         <section className="data-strip">
-          <div className="instrument"><div className="au-icon">Au</div><div><strong>TVC:GOLD <span>REFERENCE</span></strong><small>{demo ? 'Backtest source: synthetic demo (NOT TVC:GOLD)' : 'Backtest source: imported CSV (NOT VERIFIED AS TVC:GOLD)'}</small></div></div>
+          <div className="instrument"><div className="au-icon">Au</div><div><strong>{dataSource === 'dukascopy' ? 'XAUUSD' : 'TVC:GOLD'} <span>{dataSource === 'dukascopy' ? 'DUKASCOPY BID' : 'REFERENCE'}</span></strong><small>{dataSource === 'dukascopy' ? 'Real historical 15m candles · not TVC:GOLD' : demo ? 'Synthetic demo (NOT TVC:GOLD)' : 'Imported OHLCV · source unverified'}</small></div></div>
           <div className="strip-item"><small>DATASET</small><strong title={name}>{name}</strong></div>
           <div className="strip-item"><small>AVAILABLE BARS</small><strong>{bars.length.toLocaleString()}</strong></div>
           <div className="strip-item"><small>DATA INTERVAL</small><strong>{interval || '—'}m</strong></div>
           <div className="strip-item coverage-metric"><small>HISTORY AVAILABLE (UTC)</small><strong>{coverage?.first} → {coverage?.last}</strong><small>{coverage?.years.toFixed(2)} calendar years</small></div>
           <input hidden type="file" multiple accept=".csv,text/csv" ref={csvRef} onChange={e => { void importCsv(e.target.files); }}/>
-          <button className="btn primary" onClick={() => { csvModeRef.current = 'replace'; csvRef.current?.click(); }}><UploadCloud size={16}/> Import CSV files</button>
+          <button className="btn primary" disabled={fetchingHistory} onClick={() => { void loadCloudflareHistory(); }}>{fetchingHistory ? loadingProgress || 'Loading 5-year history…' : 'Load 5 years XAUUSD'}</button>
+          <button className="btn secondary" onClick={() => { csvModeRef.current = 'replace'; csvRef.current?.click(); }}><UploadCloud size={16}/> Import CSV files</button>
           {!demo && <button className="btn secondary" onClick={() => { csvModeRef.current = 'append'; csvRef.current?.click(); }}>Add more data</button>}
           {HISTORY_URL && <button className="btn secondary" disabled={fetchingHistory} onClick={() => { void loadHostedHistory(); }}>{fetchingHistory ? 'Loading history…' : 'Load hosted history'}</button>}
         </section>
@@ -284,7 +350,7 @@ export default function App() {
         <div className="workgrid">
           <div className="leftcol">
             <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ Gold</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button><button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button></div></div>
-              {chartView === 'backtest' ? <><div className="chart-bar"><strong>IMPORTED:OHLCV · {tf}m</strong><span>{demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
+              {chartView === 'backtest' ? <><div className="chart-bar"><strong>{dataSource === 'dukascopy' ? 'DUKASCOPY:XAUUSD' : 'IMPORTED:OHLCV'} · {tf}m</strong><span>{dataSource === 'dukascopy' ? 'REAL HISTORICAL BID' : demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
                   <div className="empty-equity price-chart-empty">No candles in the selected date range. Load more history or choose available dates.</div>}<div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
               : <><div className="chart-bar"><strong>TradingView · TVC:GOLD · {tf}m</strong><span>REFERENCE ONLY</span></div><GoldReferenceChart timeframe={tf}/><div className="reference-note"><Info size={15}/> TradingView provides this display-only chart. The candles are not accessible to PineTS. Backtesting uses the separately imported CSV data, never this widget.</div><div className="panel-foot"><a href="https://www.tradingview.com/symbols/TVC-GOLD/" target="_blank" rel="noreferrer">Open TVC:GOLD on TradingView <ArrowUpRight size={13}/></a><span>Data and strategy results are not synchronized</span></div></>}
             </section>
@@ -308,7 +374,7 @@ export default function App() {
 
           <div className="rightcol" id="editor">
             <section className="panel settings-panel"><div className="panel-head"><div><small>CONFIGURATION</small><h2>Backtest setup</h2></div><Settings2 size={18}/></div>
-              <label>Backtest data source</label><div className="locked-field"><span className="mini-au">Au</span><strong>IMPORTED:OHLCV</strong><span>Unverified</span></div>
+              <label>Backtest data source</label><div className="locked-field"><span className="mini-au">Au</span><strong>{dataSource === 'dukascopy' ? 'XAUUSD · BID' : 'IMPORTED:OHLCV'}</strong><span>{dataSource === 'dukascopy' ? 'Dukascopy' : 'Unverified'}</span></div>
               <label htmlFor="tf">Timeframe</label><select id="tf" value={tf} onChange={e => { setTf(Number(e.target.value)); setResults(null); }}>{OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
               <label>Date range <span>UTC / inclusive</span></label><div className="dates"><input type="date" aria-label="Start date" value={start} onChange={e => { setStart(e.target.value); setResults(null); }}/><input type="date" aria-label="End date" value={end} onChange={e => { setEnd(e.target.value); setResults(null); }}/></div>
               <div className="period-presets"><span>Quick range:</span><button onClick={() => preset(1)}>1Y</button><button onClick={() => preset(3)}>3Y</button><button onClick={() => preset(5)}>5Y</button><button onClick={() => preset('all')}>All loaded</button></div>
@@ -326,7 +392,7 @@ export default function App() {
             </section>
             <section className="panel code-panel"><div className="tabs"><button className={tab === 'editor' ? 'active' : ''} onClick={() => setTab('editor')}><Code2 size={15}/> Pine editor</button><button className={tab === 'guide' ? 'active' : ''} onClick={() => setTab('guide')}><FolderOpen size={15}/> Data guide</button></div>
               {tab === 'editor' ? <><div className="file-header"><FileCode2 size={15}/><strong>{scriptName}</strong><span>v5 / v6</span></div><textarea spellCheck={false} className="editor" aria-label="Pine Script strategy source" value={code} onChange={e => { setCode(e.target.value); setScriptName('untitled.pine'); setResults(null); }}/><div className="editor-footer"><span>{code.split('\n').length} lines</span><input hidden type="file" accept=".pine,.txt,text/plain" ref={pineRef} onChange={e => { void importPine(e.target.files?.[0]); }}/><button onClick={() => pineRef.current?.click()}><FolderOpen size={14}/> Open .pine</button><button onClick={() => save(code, scriptName, 'text/plain')}><Download size={14}/> Save</button></div><p className="editor-note"><Info size={14}/> Use a <strong>strategy()</strong> script. Some TradingView features are not supported by PineTS.</p></>
-                : <div className="guide"><h3>Exact TVC:GOLD data</h3><p>The target is TradingView <strong>TVC:GOLD</strong> on 15-minute candles for five years. It is a TradingView-calculated feed, not interchangeable with Dukascopy XAUUSD or other spot-gold products.</p><p><strong>Five-year TVC:GOLD history is not available through the public TradingView widget or an unrestricted public candle API.</strong> A compliant external backtest requires a data source that explicitly authorizes processing this exact feed. We will not scrape TradingView or silently substitute XAUUSD.</p><p>The CSV importer remains available for datasets you are authorized to process, but imported CSVs are labeled <strong>unverified OHLCV</strong>, not TVC:GOLD. Date-range controls only select candles that have actually been loaded.</p><a href={REPO + '#exact-tv-cgold-requirement'} target="_blank" rel="noreferrer">Read exact-symbol requirements <ArrowUpRight size={14}/></a></div>}
+                : <div className="guide"><h3>Five years of XAUUSD, no terminal</h3><p>On Cloudflare Pages the site build fetches and validates up to five years of Dukascopy XAUUSD BID 15-minute history. The site loads it automatically when available; you can also click <strong>Load 5 years XAUUSD</strong>. Verify the displayed first and last dates before running a backtest.</p><p>The included source script is your full <strong>Gold Breakout 15M Strategy v1.1.0</strong>, replacing the EMA demonstration. The simulation uses PineTS, so TradingView-specific behavior and order fills can differ. These are <strong>not TVC:GOLD candles</strong>.</p><p>Cloudflare Pages serves assets publicly by default. Protect your project with Cloudflare Access if this data is for personal use only, and check your provider's data rights.</p><a href={REPO + '#cloudflare-data-build'} target="_blank" rel="noreferrer">Data pipeline and privacy details <ArrowUpRight size={14}/></a></div>}
             </section>
             {error && <div className="error" role="alert"><CircleAlert size={20}/><div><strong>Backtest needs attention</strong><p>{error}</p></div><button onClick={() => setError('')}>×</button></div>}
             {results && results.trades.length === 0 && <section className="zero-diagnostics" role="status"><div className="zero-title"><CircleAlert size={19}/><strong>0 closed trades · diagnostic report</strong></div><p>The engine ran, but did not report closed orders. These checks help distinguish missing price breakouts from unsupported Pine behavior.</p><ul>{results.warnings.slice(0, 6).map((hint, i) => <li key={i}>{hint}</li>)}</ul></section>}
