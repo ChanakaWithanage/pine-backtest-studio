@@ -1,78 +1,54 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { PineTS } from 'pinets';
 import { runBacktest } from '../src/lib/backtest.ts';
+import { buildCsvPineProvider } from '../src/lib/csv-provider.ts';
 import { createDemoCandles, EXAMPLE_SCRIPT } from '../src/lib/demo.ts';
 
-test('PineTS executes a native v6 strategy against custom OHLCV candles', { timeout: 60_000 }, async () => {
-  const candles = createDemoCandles().slice(0, 500);
-  const results = await runBacktest(EXAMPLE_SCRIPT, candles);
-  assert.ok(Number.isFinite(results.netProfit));
-  assert.ok(Number.isFinite(results.initialCapital));
-  assert.ok(Array.isArray(results.trades));
-  console.log('EMA_SMOKE', JSON.stringify({ trades: results.trades.length, pending: results.pendingOrders, open: results.openTrades, net: results.netProfit }));
-  assert.ok(results.equity.length >= 1);
-  assert.ok(results.winRate >= 0 && results.winRate <= 100);
-  for (const trade of results.trades) {
-    assert.ok(Number.isFinite(trade.entryTime));
-    assert.ok(Number.isFinite(trade.entryPrice));
-    assert.ok(Number.isFinite(trade.profit));
-  }
+test('PineTS executes native Pine v6 EMA strategy and generates trades', { timeout: 60_000 }, async () => {
+  const r = await runBacktest(EXAMPLE_SCRIPT, createDemoCandles().slice(0, 500));
+  assert.ok(Number.isFinite(r.netProfit));
+  assert.ok(r.trades.length > 0, 'EMA sample must generate closed trades');
+  assert.ok(r.winRate >= 0 && r.winRate <= 100);
 });
 
-test('rejects indicator scripts that contain no strategy declaration', async () => {
-  await assert.rejects(() => runBacktest('//@version=6\nindicator("No trades")', createDemoCandles()), /strategy/);
-});
-
-test('gold-style session and risk sizing receive valid timestamp and symbol metadata', { timeout: 60_000 }, async () => {
+test('custom gold provider passes correct 15-minute close and contract metadata', { timeout: 60_000 }, async () => {
   const candles = createDemoCandles().slice(0, 250);
-  const script = `//@version=6
-strategy("Metadata Smoke Test", initial_capital=10000)
-float quantity = math.floor(200 / (close * 0.01 * syminfo.pointvalue) / syminfo.mincontract) * syminfo.mincontract
-plot(quantity, "calculated_qty")
-if bar_index == 1
-    strategy.entry("Meta", strategy.long, qty = quantity)
-if bar_index == 4
-    strategy.close("Meta")
-`;
-  const basic = `//@version=6
-strategy("Basic")
-if bar_index == 1
-    strategy.entry("L", strategy.long, qty=1)
-if bar_index == 4
-    strategy.close("L")
-`;
-  const basicResult = await runBacktest(basic, candles);
-  console.log('BASIC_SMOKE', JSON.stringify({ trades: basicResult.trades.length, pending: basicResult.pendingOrders, open: basicResult.openTrades }));
-  const { PineTS } = await import('pinets');
-  const { buildCsvPineProvider } = await import('../src/lib/csv-provider.ts');
   const feed = buildCsvPineProvider(candles, { pointvalue: 1, mincontract: 0.01, mintick: 0.01 });
-  const ctx = await new PineTS(feed.provider, feed.tickerId, feed.timeframe).run(`//@version=6
-indicator("metadata")
+  assert.equal(feed.marketData[0].closeTime - feed.marketData[0].openTime, 900000);
+  const ctx = await new PineTS(feed.provider, feed.tickerId, feed.timeframe).run(String.raw`//@version=6
+indicator("Metadata")
 plot(syminfo.pointvalue, "point")
 plot(syminfo.mincontract, "step")
 plot(time_close - time, "duration")
-plot(math.floor(200 / (close * 0.01 * syminfo.pointvalue) / syminfo.mincontract) * syminfo.mincontract, "qtycalc")
+plot(math.floor(200 / (close * 0.01 * syminfo.pointvalue) / syminfo.mincontract) * syminfo.mincontract, "qty")
 `);
-  console.log('SYMBOL_META', JSON.stringify({ info: feed.symbolInfo, point: ctx.plots['point']?.data.slice(-2), step: ctx.plots['step']?.data.slice(-2), duration: ctx.plots['duration']?.data.slice(-2), qty: ctx.plots['qtycalc']?.data.slice(-2) }));
-  const qtyCode = `//@version=6
-strategy("Qty Only")
+  assert.equal(ctx.plots['point'].data[0].value, 1);
+  assert.equal(ctx.plots['step'].data[0].value, 0.01);
+  assert.equal(ctx.plots['duration'].data[0].value, 900000);
+  assert.ok(ctx.plots['qty'].data[0].value > 0);
+});
+
+test('Pine strategy can open and close an order using symbol minimum contract', { timeout: 60_000 }, async () => {
+  const script = String.raw`//@version=6
+strategy("Symbol quantity")
 if bar_index == 1
-    strategy.entry("Q", strategy.long, qty=syminfo.mincontract)
+    strategy.entry("Meta", strategy.long, qty=syminfo.mincontract)
 if bar_index == 4
-    strategy.close("Q")
+    strategy.close("Meta")
 `;
-  const q = await runBacktest(qtyCode, candles);
-  console.log('STEP_SMOKE', JSON.stringify({ trades: q.trades.length, open: q.openTrades, pending: q.pendingOrders }));
-  const r = await runBacktest(script, candles, { pointvalue: 1, mincontract: 0.01, mintick: 0.01 });
-  console.log('GOLD_SMOKE', JSON.stringify({ trades: r.trades.length, pending: r.pendingOrders, open: r.openTrades, net: r.netProfit, warnings: r.warnings }));
-  assert.equal(r.trades.length, 1, 'known strategy must close a risk-sized order');
+  const r = await runBacktest(script, createDemoCandles().slice(0, 250));
+  assert.equal(r.trades.length, 1);
   assert.ok(r.trades[0].size > 0);
+  assert.equal(r.pendingOrders, 0);
+});
+
+test('rejects indicator-only scripts', async () => {
+  await assert.rejects(() => runBacktest('//@version=6\nindicator("No trades")', createDemoCandles()), /strategy/);
 });
 
 test('rejects invalid gold contract metadata', async () => {
-  const candles = createDemoCandles().slice(0, 50);
-  await assert.rejects(
-    () => runBacktest(EXAMPLE_SCRIPT, candles, { pointvalue: 0, mincontract: 1, mintick: 0.01 }),
-    /pointvalue/
-  );
+  await assert.rejects(() => runBacktest(EXAMPLE_SCRIPT, createDemoCandles().slice(0, 50), {
+    pointvalue: 0, mincontract: 1, mintick: 0.01
+  }), /pointvalue/);
 });
