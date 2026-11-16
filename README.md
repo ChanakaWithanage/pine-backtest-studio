@@ -38,7 +38,7 @@ npm install
 npm run dev
 ~~~
 
-Open the URL Vite prints (usually http://localhost:5173). The app starts with *synthetic* example candles and a simple EMA crossover strategy; click **Run Backtest** to verify the interaction.
+Open the URL Vite prints (usually http://localhost:5173). The app opens your full **Gold Breakout 15M Strategy v1.1.0** as the default source. On Cloudflare Pages it automatically loads the generated five-year XAUUSD candles. Local development without the hosted-data build still starts with a clearly labeled synthetic demo.
 
 **Tests and build**
 
@@ -49,9 +49,9 @@ npm run build
 
 The compiled static site is in dist/. Cloudflare Pages: **Build command** npm run build, **output directory** dist, **Node version** 22.
 
-## Historical gold data
+## Historical gold data: optional manual workflow
 
-Use [dukascopy-node](https://www.dukascopy-node.app/quick-start) to download extended XAUUSD history. Data is downloaded on your own machine, not from the deployed webpage.
+**Cloudflare users need no terminal or local clone.** The hosted build handles the five-year data import automatically. The following CLI is only an optional method for developers who run the project locally, using [dukascopy-node](https://www.dukascopy-node.app/quick-start).
 
 ~~~bash
 npm run download:gold
@@ -88,7 +88,7 @@ timestamp,open,high,low,close,volume
 
 ### Making five-year history available on a Cloudflare Pages website
 
-The GitHub repository contains **no real gold candles**. The default app still starts with a short synthetic dataset beginning in October 2026. Changing a date does not automatically download history.
+The GitHub repository contains **no committed gold candles**. However, when Cloudflare Pages builds the site, its prebuild hook downloads approximately five calendar years of real Dukascopy XAUUSD BID candles and includes them in the published site assets. If the build fails, no new dataset is deployed.
 
 For **personal testing**, run npm run download:gold, then import the resulting data/ CSV into your Cloudflare-hosted app. This works without a separate backend or Cloudflare plan upgrade because the CSV stays in your browser.
 
@@ -126,7 +126,7 @@ For continuing daily data, Cloudflare Pages rebuilds from GitHub when you push c
 
 ## Run your own Pine strategy
 
-1. Choose **Import CSV files** for your real history, or use the synthetic demo only to test the interface.
+1. On the Cloudflare site, the real five-year XAUUSD history is requested automatically. If necessary click **Load 5 years XAUUSD**. CSV import is optional.
 2. Select a valid date range and timeframe. The source interval must divide the selected output interval.
 3. Paste Pine Script into the **Pine editor** or load a .pine file. It must declare strategy(), not indicator().
 4. Click **Run Backtest**. Closed trades and simulated performance appear below the chart.
@@ -136,7 +136,7 @@ The checked-in example is [samples/ema-crossover.pine](samples/ema-crossover.pin
 
 ## Interpretation and limitations
 
-- **Not identical feeds:** Dukascopy XAUUSD, TVC:GOLD, exchange gold futures and PAXGUSDT represent different markets/feeds. Timestamps and prices may differ.
+- **Not identical feeds:** The requested benchmark is TVC:GOLD, but this personal-testing fallback uses Dukascopy XAUUSD BID. Exchange gold futures and PAXGUSDT also differ. Timestamps, levels, and strategy performance may not match.
 - **Engine differences:** Native Pine execution in PineTS is evolving; not every function/setting/library works, even when a script compiles. Compare on a shared history window.
 - **Intrabar ambiguity:** Historical OHLC bars alone cannot always determine whether a stop or target fired first. The engine cannot reproduce TradingView's Bar Magnifier from a 15m CSV alone.
 - **Costs and trade size:** Edit the strategy() declaration to configure initial_capital, default_qty_type, commission_type, commission_value and slippage. The UI does not override these settings.
