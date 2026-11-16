@@ -139,3 +139,29 @@ footer{display:flex;justify-content:space-between;gap:15px;padding:29px 0 4px;co
 .zero-success strong{font-size:12px}
 .zero-success p{font-size:11px;margin:7px 0 0;color:#9aaec0}
 @media(max-width:620px){.chart-source-tabs button{padding:8px;font-size:10px}.chart-panel>.panel-head{align-items:start;flex-direction:column}.tv-gold-embed{height:340px}}
+
+
+/* Historical data coverage, honest ranges and multi-file loading */
+.coverage-metric{min-width:225px;flex:1.35}
+.coverage-metric strong{max-width:none;font-size:12px;white-space:normal}
+.coverage-metric small:last-child{letter-spacing:.15px;font-size:10px;color:#5bd6bb}
+.history-coverage{border:1px solid #2a4650;background:#12262c;border-radius:11px;margin:-6px 0 22px;padding:15px 17px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.history-coverage.history-warning{border-color:#675032;background:#2a251d}
+.history-description{display:flex;align-items:flex-start;gap:11px;min-width:0}
+.history-description>svg{flex:none;color:#65d9bd;margin-top:2px}
+.history-warning .history-description>svg{color:#efc185}
+.history-description strong{color:#d6ede6;font-size:12px}
+.history-warning .history-description strong{color:#f2d6a8}
+.history-description p{margin:6px 0 0;color:#9eb9b7;font-size:11px;line-height:1.6}
+.history-warning .history-description p{color:#d2bda3}
+.history-description .demo-history{font-weight:700;color:#e9bc82}
+.history-description .history-import-status{color:#61dac0}
+.history-guide-link{display:flex;align-items:center;gap:8px;background:#1b443c;color:#6be6ca;border:1px solid #2d6759;padding:10px 12px;border-radius:7px;white-space:nowrap;font-size:11px;font-weight:700}
+.history-guide-link:hover{background:#205348}
+.period-presets{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:-7px 19px 17px}
+.period-presets span{font-size:10px;color:#7e95a7;margin-right:auto}
+.period-presets button{border:1px solid #3a5164;background:#1b2e3b;color:#9dd3c4;padding:6px 9px;border-radius:5px;font-size:10px;font-weight:700}
+.period-presets button:hover{border-color:#5ad6b9;color:#e0fff5}
+.date-coverage-alert{margin:-8px 19px 15px;color:#f4cb8c;font-size:10px;line-height:1.55}
+.price-chart-empty{height:340px;padding:25px;text-align:center}
+@media(max-width:800px){.history-coverage{flex-direction:column;align-items:stretch}.history-guide-link{justify-content:center}.coverage-metric{min-width:155px}}

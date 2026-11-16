@@ -3,10 +3,12 @@ import { ArrowRight, ArrowUpRight, BarChart3, Check, ChevronRight, CircleAlert, 
 import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, type UTCTimestamp } from 'lightweight-charts';
 import { createDemoCandles, EXAMPLE_SCRIPT } from './lib/demo';
 import { DEFAULT_CONTRACT } from './lib/csv-provider';
+import { checkRequestedCoverage, getHistoryCoverage, mergeCandleBatches, pastYearsFromLastCandle } from './lib/history';
 import { exportTrades, inferIntervalMinutes, parseCsv, resampleCandles } from './lib/csv';
 import type { Candle, Results, Trade, ContractSettings, WorkerResponse } from './types';
 
 const REPO = 'https://github.com/ChanakaWithanage/pine-backtest-studio';
+const HISTORY_URL = import.meta.env.VITE_GOLD_HISTORY_URL?.trim() || '';
 const OPTIONS = [{ value: 3, label: '3 minutes' }, { value: 5, label: '5 minutes' }, { value: 15, label: '15 minutes' }, { value: 30, label: '30 minutes' }, { value: 60, label: '1 hour' }, { value: 240, label: '4 hours' }];
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const money = (n: number) => Number.isFinite(n) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n) : '—';
@@ -112,6 +114,9 @@ export default function App() {
   const [scriptName, setScriptName] = useState('ema-crossover.pine');
   const [tf, setTf] = useState(15);
   const [chartView, setChartView] = useState<'backtest' | 'reference'>('backtest');
+  const [fetchingHistory, setFetchingHistory] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
+  const csvModeRef = useRef<'replace' | 'append'>('replace');
   const [contract, setContract] = useState<ContractSettings>({ ...DEFAULT_CONTRACT });
   const [start, setStart] = useState(day(DEMO[0].time));
   const [end, setEnd] = useState(day(DEMO[DEMO.length - 1].time));
@@ -128,24 +133,86 @@ export default function App() {
 
   useEffect(() => () => workerRef.current?.terminate(), []);
   const interval = useMemo(() => inferIntervalMinutes(bars), [bars]);
+  const coverage = useMemo(() => getHistoryCoverage(bars), [bars]);
+  const coverageIssue = useMemo(() => checkRequestedCoverage(bars, start, end), [bars, start, end]);
   const selection = useMemo(() => {
     const from = Date.parse(start + 'T00:00:00Z'), to = Date.parse(end + 'T00:00:00Z') + 86400000;
     if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) return [];
     try { return resampleCandles(bars.filter(b => b.time >= from && b.time < to), tf); } catch { return []; }
   }, [bars, start, end, tf]);
   const stop = () => { workerRef.current?.terminate(); workerRef.current = null; setRunning(false); };
-  const reset = () => { stop(); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
-  async function importCsv(file?: File) {
-    if (!file) return;
+  const reset = () => { stop(); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
+  function applyHistory(next: Candle[], label: string) {
+    stop();
+    setBars(next);
+    setDemo(false);
+    setName(label);
+    setTf(inferIntervalMinutes(next) || 15);
+    setStart(day(next[0].time));
+    setEnd(day(next[next.length - 1].time));
+    setResults(null);
+    setUsedBars(0);
+    setError('');
+    setImportMessage(
+      'Loaded ' + next.length.toLocaleString() + ' candles from ' +
+      day(next[0].time) + ' through ' + day(next[next.length - 1].time) + ' (UTC).'
+    );
+  }
+
+  async function importCsv(files?: FileList | null) {
+    if (!files?.length) return;
     try {
-      if (file.size > 75 * 1024 * 1024) throw new Error('Maximum CSV size is 75 MB.');
-      const parsed = parseCsv(await file.text());
-      stop(); setBars(parsed); setDemo(false); setName(file.name);
-      setStart(day(parsed[0].time)); setEnd(day(parsed[parsed.length - 1].time));
-      setTf(inferIntervalMinutes(parsed) || 15); setResults(null); setError('');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Failed to load CSV.'); }
+      const selected = Array.from(files);
+      if (selected.length > 20) throw new Error('Select at most 20 historical CSV files at once.');
+      if (selected.some(file => file.size > 75 * 1024 * 1024)) {
+        throw new Error('Each CSV file must be 75 MB or smaller.');
+      }
+      const total = selected.reduce((sum, file) => sum + file.size, 0);
+      if (total > 90 * 1024 * 1024) {
+        throw new Error('The combined import exceeds 90 MB. Use fewer files.');
+      }
+      const incoming = await Promise.all(selected.map(async file => parseCsv(await file.text())));
+      const prior = csvModeRef.current === 'append' && !demo ? [bars] : [];
+      const merged = mergeCandleBatches([...prior, ...incoming]);
+      const label = prior.length ? 'Combined CSV history' :
+        selected.length === 1 ? selected[0].name : selected.length + ' combined CSV files';
+      applyHistory(merged, label);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load CSV history.');
+    }
     if (csvRef.current) csvRef.current.value = '';
   }
+
+  async function loadHostedHistory() {
+    if (!HISTORY_URL) return;
+    setFetchingHistory(true);
+    setError('');
+    try {
+      const response = await fetch(HISTORY_URL, { cache: 'no-cache' });
+      if (!response.ok) throw new Error('History endpoint returned HTTP ' + response.status + '.');
+      const text = await response.text();
+      if (text.length > 75 * 1024 * 1024) {
+        throw new Error('Hosted history exceeds the 75 MB import limit.');
+      }
+      const parsed = parseCsv(text);
+      applyHistory(parsed, 'Hosted XAUUSD · historical CSV');
+    } catch (e) {
+      setError('Could not load hosted history. ' +
+        (e instanceof Error ? e.message : String(e)) +
+        ' Verify the URL, browser CORS policy, and CSV format.');
+    } finally {
+      setFetchingHistory(false);
+    }
+  }
+
+  function preset(years: number | 'all') {
+    const range = years === 'all'
+      ? { start: day(bars[0].time), end: day(bars[bars.length - 1].time) }
+      : pastYearsFromLastCandle(bars, years);
+    stop();
+    setStart(range.start); setEnd(range.end); setResults(null); setError('');
+  }
+
   async function importPine(file?: File) {
     if (!file) return;
     try {
@@ -158,7 +225,8 @@ export default function App() {
     setError('');
     let data: Candle[];
     try {
-      if (start > end) throw new Error('Start date must be before end date.');
+      const missing = checkRequestedCoverage(bars, start, end);
+      if (missing) throw new Error(missing);
       data = resampleCandles(bars.filter(b => b.time >= Date.parse(start + 'T00:00:00Z') && b.time < Date.parse(end + 'T00:00:00Z') + 86400000), tf);
       if (data.length < 40) throw new Error('Need at least 40 complete candles in your selected date range.');
     } catch (e) { setError(e instanceof Error ? e.message : 'Unsupported timeframe.'); return; }
@@ -190,14 +258,33 @@ export default function App() {
           <div className="strip-item"><small>DATASET</small><strong title={name}>{name}</strong></div>
           <div className="strip-item"><small>AVAILABLE BARS</small><strong>{bars.length.toLocaleString()}</strong></div>
           <div className="strip-item"><small>DATA INTERVAL</small><strong>{interval || '—'}m</strong></div>
-          <input hidden type="file" accept=".csv,text/csv" ref={csvRef} onChange={e => { void importCsv(e.target.files?.[0]); }}/>
-          <button className="btn primary" onClick={() => csvRef.current?.click()}><UploadCloud size={16}/> Import CSV</button>
+          <div className="strip-item coverage-metric"><small>HISTORY AVAILABLE (UTC)</small><strong>{coverage?.first} → {coverage?.last}</strong><small>{coverage?.years.toFixed(2)} calendar years</small></div>
+          <input hidden type="file" multiple accept=".csv,text/csv" ref={csvRef} onChange={e => { void importCsv(e.target.files); }}/>
+          <button className="btn primary" onClick={() => { csvModeRef.current = 'replace'; csvRef.current?.click(); }}><UploadCloud size={16}/> Import CSV files</button>
+          {!demo && <button className="btn secondary" onClick={() => { csvModeRef.current = 'append'; csvRef.current?.click(); }}>Add more data</button>}
+          {HISTORY_URL && <button className="btn secondary" disabled={fetchingHistory} onClick={() => { void loadHostedHistory(); }}>{fetchingHistory ? 'Loading history…' : 'Load hosted history'}</button>}
+        </section>
+        <section className={'history-coverage ' + (coverageIssue ? 'history-warning' : 'history-ok')}>
+          <div className="history-description">
+            <Info size={18}/>
+            <div>
+              <strong>{coverageIssue ? 'Incomplete selected history' : 'Historical data coverage'}</strong>
+              <p>{coverageIssue || ('Loaded candles cover ' + coverage?.first + ' through ' + coverage?.last +
+                ' (' + coverage?.count.toLocaleString() + ' bars). The date picker filters loaded history; it cannot fetch older prices.')}</p>
+              {demo && <p className="demo-history">This is only the October 2026 synthetic demonstration. These trades are not real gold backtest results.</p>}
+              {importMessage && <p className="history-import-status">{importMessage}</p>}
+            </div>
+          </div>
+          <button onClick={() => { setTab('guide'); document.getElementById('editor')?.scrollIntoView({ behavior: 'smooth' }); }} className="history-guide-link">
+            Get 5 years of gold data <ArrowRight size={15}/>
+          </button>
         </section>
 
         <div className="workgrid">
           <div className="leftcol">
             <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ Gold</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button><button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button></div></div>
-              {chartView === 'backtest' ? <><div className="chart-bar"><strong>CSV:XAUUSD · {tf}m</strong><span>{demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div><PriceChart bars={selection.length ? selection : bars} trades={results?.trades || []}/><div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
+              {chartView === 'backtest' ? <><div className="chart-bar"><strong>CSV:XAUUSD · {tf}m</strong><span>{demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
+                  <div className="empty-equity price-chart-empty">No candles in the selected date range. Load more history or choose available dates.</div>}<div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
               : <><div className="chart-bar"><strong>TradingView · TVC:GOLD · {tf}m</strong><span>REFERENCE ONLY</span></div><GoldReferenceChart timeframe={tf}/><div className="reference-note"><Info size={15}/> TradingView provides this display-only chart. The candles are not accessible to PineTS. Backtesting uses the separately imported CSV data, never this widget.</div><div className="panel-foot"><a href="https://www.tradingview.com/symbols/TVC-GOLD/" target="_blank" rel="noreferrer">Open TVC:GOLD on TradingView <ArrowUpRight size={13}/></a><span>Data and strategy results are not synchronized</span></div></>}
             </section>
 
@@ -223,6 +310,8 @@ export default function App() {
               <label>Backtest data source</label><div className="locked-field"><span className="mini-au">Au</span><strong>CSV:XAUUSD</strong><span>Not TVC:GOLD</span></div>
               <label htmlFor="tf">Timeframe</label><select id="tf" value={tf} onChange={e => { setTf(Number(e.target.value)); setResults(null); }}>{OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
               <label>Date range <span>UTC / inclusive</span></label><div className="dates"><input type="date" aria-label="Start date" value={start} onChange={e => { setStart(e.target.value); setResults(null); }}/><input type="date" aria-label="End date" value={end} onChange={e => { setEnd(e.target.value); setResults(null); }}/></div>
+              <div className="period-presets"><span>Quick range:</span><button onClick={() => preset(1)}>1Y</button><button onClick={() => preset(3)}>3Y</button><button onClick={() => preset(5)}>5Y</button><button onClick={() => preset('all')}>All loaded</button></div>
+              {coverageIssue && <p className="date-coverage-alert">The chosen dates exceed the loaded dataset. Import older candles before starting the backtest.</p>
               <div className="bar-count"><ShieldCheck size={14}/>{selection.length.toLocaleString()} complete bars selected</div>
               <details className="contract-settings" open><summary>Gold contract settings <span>Required for risk sizing</span></summary><p>These are simulation assumptions, not verified TVC:GOLD contract specifications. Match your broker/instrument before comparing P&L.</p>
               <div className="contract-fields">
@@ -230,13 +319,13 @@ export default function App() {
               <label>Minimum qty/step <input type="number" min="0.000001" step="any" value={contract.mincontract} onChange={e => { setContract(v => ({ ...v, mincontract: Number(e.target.value) })); setResults(null); }}/></label>
               <label>Price tick size <input type="number" min="0.000001" step="any" value={contract.mintick} onChange={e => { setContract(v => ({ ...v, mintick: Number(e.target.value) })); setResults(null); }}/></label>
               </div></details>
-              <button className="btn run" disabled={running} onClick={run}>{running ? <span className="spinner"/> : <Play size={17} fill="currentColor"/>}{running ? 'Running strategy…' : 'Run Backtest'}<ArrowRight size={17}/></button>
+              <button className="btn run" disabled={running || fetchingHistory || Boolean(coverageIssue)} onClick={run}>{running ? <span className="spinner"/> : <Play size={17} fill="currentColor"/>}{running ? 'Running strategy…' : 'Run Backtest'}<ArrowRight size={17}/></button>
               {running && <button className="text-button cancel" onClick={() => { stop(); setError('Backtest cancelled.'); }}>Cancel run</button>}
               <div className="help-note"><Info size={15}/> Calculations run in your browser. Your CSV and Pine source are not uploaded.</div>
             </section>
             <section className="panel code-panel"><div className="tabs"><button className={tab === 'editor' ? 'active' : ''} onClick={() => setTab('editor')}><Code2 size={15}/> Pine editor</button><button className={tab === 'guide' ? 'active' : ''} onClick={() => setTab('guide')}><FolderOpen size={15}/> Data guide</button></div>
               {tab === 'editor' ? <><div className="file-header"><FileCode2 size={15}/><strong>{scriptName}</strong><span>v5 / v6</span></div><textarea spellCheck={false} className="editor" aria-label="Pine Script strategy source" value={code} onChange={e => { setCode(e.target.value); setScriptName('untitled.pine'); setResults(null); }}/><div className="editor-footer"><span>{code.split('\n').length} lines</span><input hidden type="file" accept=".pine,.txt,text/plain" ref={pineRef} onChange={e => { void importPine(e.target.files?.[0]); }}/><button onClick={() => pineRef.current?.click()}><FolderOpen size={14}/> Open .pine</button><button onClick={() => save(code, scriptName, 'text/plain')}><Download size={14}/> Save</button></div><p className="editor-note"><Info size={14}/> Use a <strong>strategy()</strong> script. Some TradingView features are not supported by PineTS.</p></>
-                : <div className="guide"><h3>Get 3 years of gold</h3><p>Use the included Node.js downloader to create an XAUUSD CSV, then click Import CSV.</p><span>TERMINAL</span><pre>npm run download:gold -- 2023-11-16 2026-11-16 m15</pre><p>Data appears in <code>data/</code>. A 15m file cannot produce genuine 3m bars; download m1 data for that.</p><a href={REPO + '#historical-gold-data'} target="_blank" rel="noreferrer">View setup guide <ArrowUpRight size={14}/></a></div>}
+                : <div className="guide"><h3>Get 5 years of gold</h3><p>The date picker does not download history. For a five-year, 15-minute XAUUSD backtest, obtain an actual historical CSV from your data provider. For personal research, the repository includes a Dukascopy downloader:</p><span>TERMINAL (RUN ON YOUR COMPUTER)</span><pre>npm run download:gold</pre><p>This defaults to the last five calendar years, 15-minute XAUUSD bid candles, through today's available prices. Output is saved in <code>data/</code>. Select the file using <strong>Import CSV files</strong>. You can also select several yearly files together or append new ones. A 15-minute file cannot generate 3-minute candles; use 1-minute source data for that.</p><p>Dukascopy XAUUSD is a different feed from TradingView's TVC:GOLD. Downloading is for your own research; check provider terms before publishing data on a public website.</p><a href={REPO + '#historical-gold-data'} target="_blank" rel="noreferrer">View setup guide <ArrowUpRight size={14}/></a></div>}
             </section>
             {error && <div className="error" role="alert"><CircleAlert size={20}/><div><strong>Backtest needs attention</strong><p>{error}</p></div><button onClick={() => setError('')}>×</button></div>}
             {results && results.trades.length === 0 && <section className="zero-diagnostics" role="status"><div className="zero-title"><CircleAlert size={19}/><strong>0 closed trades · diagnostic report</strong></div><p>The engine ran, but did not report closed orders. These checks help distinguish missing price breakouts from unsupported Pine behavior.</p><ul>{results.warnings.slice(0, 6).map((hint, i) => <li key={i}>{hint}</li>)}</ul></section>}

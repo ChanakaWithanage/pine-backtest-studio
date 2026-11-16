@@ -44,10 +44,13 @@ The compiled static site is in dist/. Cloudflare Pages: **Build command** npm ru
 Use [dukascopy-node](https://www.dukascopy-node.app/quick-start) to download extended XAUUSD history. Data is downloaded on your own machine, not from the deployed webpage.
 
 ~~~bash
-npm run download:gold -- 2023-11-16 2026-11-16 m15
+npm run download:gold
+
+# Optional exact UTC range (upper bound exclusive):
+npm run download:gold -- 2021-11-16 2026-11-17 m15
 ~~~
 
-This runs npx dukascopy-node with caching, retries, pacing, and volume, and saves CSV in the **data/** directory. Date upper bound is exclusive (2026-11-16 means through the end of 2026-11-15). Choose the generated CSV using **Import CSV**.
+With no arguments, this runs the CLI for the latest five calendar years, at 15-minute resolution, up to tomorrow 00:00 UTC (the end bound is exclusive). It requests XAUUSD **bid** OHLCV, enables caching/retries/rate pacing, and saves a CSV in the ignored local **data/** directory. The download can take considerable time and depends on the provider being reachable. Select the resulting CSV in the **Import CSV files** control; no historical data is bundled or downloaded merely by changing the date picker.
 
 For 5-minute bars, use m5. For 3-minute analysis, download m1 candles first and aggregate them to 3m in the app. **You cannot derive genuine 3-minute candles from 15-minute candles.**
 
@@ -63,12 +66,33 @@ timestamp,open,high,low,close,volume
 - Required columns: timestamp (or time/date), open, high, low, close. volume is optional.
 - Data is sorted by timestamp; duplicate timestamps and invalid OHLC values are rejected.
 - Gaps are not filled with invented prices. Aggregating intervals drops incomplete groups.
-- Browser import safety limits: 75 MB / 400,000 rows. There is no data provider integration on the website yet.
+- Browser import limits: 75 MB per CSV, 90 MB combined in a single selection, 400,000 merged bars. Five years of 15-minute gold history normally fits, but a five-year 1-minute dataset might not.
+- Import several same-interval CSV files at once; the app sorts and deduplicates exact overlapping candles. It refuses conflicting overlapping bars, which may indicate a mixed price feed.
+- **Add more data** merges further files into an existing imported dataset without discarding prior years.
+- **Actual available history is shown prominently** in UTC, along with the number of bars and time span. Date-range presets (1Y / 3Y / 5Y / All loaded) are anchored to the most recent loaded bar.
+- A date range exceeding actual loaded coverage will be **blocked** with an explanatory message. Selecting January 2026 on the built-in October 2026 demo can no longer silently backtest only October.
+- An optional VITE_GOLD_HISTORY_URL build-time environment variable points to a *licensed/permitted*, user-hosted CSV. When configured, the app presents a **Load hosted history** button. The remote endpoint must permit browser CORS or be same-origin. This is not a live TradingView data API and no default URL is shipped.
 - Historical data is *not* committed to Git. Check your data provider's usage rights before redistributing.
+
+
+
+### Making five-year history available on a Cloudflare Pages website
+
+The GitHub repository contains **no real gold candles**. The default app still starts with a short synthetic dataset beginning in October 2026. Changing a date does not automatically download history.
+
+For **personal testing**, run npm run download:gold, then import the resulting data/ CSV into your Cloudflare-hosted app. This works without a separate backend or Cloudflare plan upgrade because the CSV stays in your browser.
+
+To offer a **preloaded** dataset to every visitor, first obtain a historical data feed and permission for the intended redistribution/use. Host its CSV at a publicly accessible URL (such as an appropriately configured Cloudflare R2 bucket, within provider licensing) and set Cloudflare Pages' build-time VITE_GOLD_HISTORY_URL variable to the URL. The UI will reveal a Load hosted history button. If the URL is cross-origin, configure CORS. Rebuild the site after changing the variable. The CSV should include a header, UTC timestamps, and OHLCV; valid bid/ask/mid series should not be merged indiscriminately.
+
+Dukascopy permits historical data export for research, but its general site terms restrict some republishing and commercial uses. The library's open-source license does **not** grant redistribution rights to the underlying market data. Do not upload Dukascopy's bulk dataset to a public site without confirming rights with the provider.
+
+### Running a five-year backtest
+
+A five-year XAUUSD m15 CSV commonly includes around 120,000–130,000 session candles. The data import supports this size, but full PineTS execution speed and memory usage depend on the complexity of the script and browser hardware. Start by verifying a one-year overlapping period against TradingView, and increase to five years after checking correct data coverage, session timezone, and strategy order size. There is no 19-trade cap in the software.
 
 ## Run your own Pine strategy
 
-1. Choose **Import CSV**, or use the synthetic demo to test the interface.
+1. Choose **Import CSV files** for your real history, or use the synthetic demo only to test the interface.
 2. Select a valid date range and timeframe. The source interval must divide the selected output interval.
 3. Paste Pine Script into the **Pine editor** or load a .pine file. It must declare strategy(), not indicator().
 4. Click **Run Backtest**. Closed trades and simulated performance appear below the chart.

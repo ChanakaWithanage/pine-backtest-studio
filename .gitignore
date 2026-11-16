@@ -8,3 +8,7 @@ coverage/
 *.log
 data/
 .dukascopy-cache/
+
+# Do not commit historical gold price datasets without redistribution rights.
+public/history/*.csv
+public/history/*.csv.gz
