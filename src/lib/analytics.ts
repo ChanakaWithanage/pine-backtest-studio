@@ -168,32 +168,33 @@ function sideStats(trades: Trade[], side: Trade['direction']): SidePerformance {
 }
 function streakStats(trades: Trade[]) {
   const streaks: OutcomeStreak[] = [];
-  let current: OutcomeStreak | null = null;
+  let previousOutcome: 'win' | 'loss' | null = null;
   for (const trade of trades) {
     if (trade.profit === 0) {
-      if (current) streaks.push(current);
-      current = null;
-      continue; // Breakeven terminates streaks.
+      previousOutcome = null; // Breakeven ends the prior sequence.
+      continue;
     }
-    const kind = trade.profit > 0 ? 'win' : 'loss';
-    if (current?.kind === kind) {
-      current.length++;
-      current.pnl += trade.profit;
-      current.end = trade.exitTime;
+    const kind: OutcomeStreak['kind'] = trade.profit > 0 ? 'win' : 'loss';
+    const last = streaks[streaks.length - 1];
+    if (previousOutcome === kind && last && last.kind === kind) {
+      last.length++;
+      last.pnl += trade.profit;
+      last.end = trade.exitTime;
     } else {
-      if (current) streaks.push(current);
-      current = {
+      streaks.push({
         kind, length: 1, pnl: trade.profit,
         start: trade.exitTime, end: trade.exitTime
-      };
+      });
     }
+    previousOutcome = kind;
   }
-  if (current) streaks.push(current);
   return {
     streaks,
-    currentStreak: current,
-    longestWinningStreak: Math.max(0, ...streaks.filter(s => s.kind === 'win').map(s => s.length)),
-    longestLosingStreak: Math.max(0, ...streaks.filter(s => s.kind === 'loss').map(s => s.length))
+    currentStreak: previousOutcome ? streaks[streaks.length - 1] ?? null : null,
+    longestWinningStreak: streaks.reduce((best, streak) =>
+      streak.kind === 'win' ? Math.max(best, streak.length) : best, 0),
+    longestLosingStreak: streaks.reduce((best, streak) =>
+      streak.kind === 'loss' ? Math.max(best, streak.length) : best, 0)
   };
 }
 
