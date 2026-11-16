@@ -1,4 +1,4 @@
-import { inferIntervalMinutes } from './csv';
+import { inferIntervalMinutes } from './csv.ts';
 import type { Candle, ContractSettings } from '../types';
 
 /**

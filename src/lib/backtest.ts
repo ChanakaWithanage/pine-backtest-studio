@@ -1,6 +1,6 @@
 import { PineTS } from 'pinets';
-import { DEFAULT_CONTRACT, buildCsvPineProvider } from './csv-provider';
-import { zeroTradeHints } from './diagnostics';
+import { DEFAULT_CONTRACT, buildCsvPineProvider } from './csv-provider.ts';
+import { zeroTradeHints } from './diagnostics.ts';
 import type { Candle, Results, Trade, EquityPoint, ContractSettings } from '../types';
 
 interface PineTrade {
