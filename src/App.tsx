@@ -4,6 +4,7 @@ import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, type UT
 import { createDemoCandles } from './lib/demo';
 import GoldBreakoutSource from '../samples/gold-breakout-15m.pine?raw';
 import BacktestAnalysis from './BacktestAnalysis';
+import DataLibrary from './DataLibrary';
 import { DEFAULT_CONTRACT } from './lib/csv-provider';
 import { DEFAULT_FEES, DEFAULT_BYBIT, planExecutionCosts, type FeeSettings, type BybitSettings } from './lib/commissions';
 import { BybitSettingsPanel, BybitResultsPanel } from './BybitComponents';
@@ -149,9 +150,8 @@ export default function App() {
   useEffect(() => {
     // Cloudflare builds generate /history/manifest.json. When missing (e.g.
     // local dev) the app stays in its clearly marked synthetic demo state.
-    if (autoLoadStarted.current) return;
-    autoLoadStarted.current = true;
-    void loadCloudflareHistory(true);
+    // Public V2 deliberately does not auto-fetch or republish third-party candles.
+    // Visitors start with clearly marked synthetic demo or import their own CSV.
   }, []);
   const feePreview = useMemo(() => {
     try { return { plan: planExecutionCosts(code, fees, contract.pointvalue, contract.mintick), error: '' }; }
@@ -326,19 +326,27 @@ export default function App() {
   return <div className="app">
     <aside className="rail"><div className="rail-brand"><Layers3 size={25}/></div><div className="rail-links"><span className="rail-link active" title="Backtesting"><BarChart3 size={20}/></span><button className="rail-link" title="Pine editor" onClick={() => { setTab('editor'); document.getElementById('editor')?.scrollIntoView({ behavior: 'smooth' }); }}><Code2 size={20}/></button><button className="rail-link" title="Data setup" onClick={() => { setTab('guide'); document.getElementById('editor')?.scrollIntoView({ behavior: 'smooth' }); }}><Settings2 size={20}/></button></div><a className="rail-link rail-github" target="_blank" rel="noreferrer" href={REPO} title="GitHub"><Github size={20}/></a></aside>
     <div className="content-shell">
-      <header className="topbar"><div className="brand"><Layers3 size={20}/><strong>PINE<span>BACKTEST</span></strong><small>STUDIO</small></div><div className="header-right"><span className="local"><i/> LOCAL RESEARCH WORKSPACE</span><a href={REPO} target="_blank" rel="noreferrer"><Github size={16}/> GitHub <ArrowUpRight size={14}/></a></div></header>
+      <header className="topbar"><div className="brand"><Layers3 size={20}/><strong>PINE<span>BACKTEST</span></strong><small>STUDIO · V2 BETA</small></div><div className="header-right"><span className="local"><i/> LOCAL RESEARCH WORKSPACE</span><a href={REPO} target="_blank" rel="noreferrer"><Github size={16}/> GitHub <ArrowUpRight size={14}/></a></div></header>
       <main className="main">
         <div className="breadcrumb">WORKSPACE <ChevronRight size={13}/> STRATEGY BACKTESTER</div>
-        <div className="headline"><div><div className="eyebrow"><i/> EXTENDED HISTORY ENGINE</div><h1>Strategy Backtester<span>.</span></h1><p>Run Pine Script strategies on your own historical data, beyond chart history limits.</p></div><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset demo</button></div>
-        <div className="notice"><Info size={17}/><p><strong>Default strategy: Gold Breakout 15M v1.1.0.</strong> {dataSource === 'dukascopy' ? 'Backtest candles: ten-year Dukascopy XAUUSD BID (15m), not TradingView TVC:GOLD.' : dataSource === 'demo' ? 'Loading real gold candles where available. The temporary demo uses synthetic prices, not actual gold.' : 'Custom CSV imported: its source is not verified as TVC:GOLD.'} The TVC:GOLD chart is a reference only; different gold feeds may produce different trade results.</p></div>
+        <div className="headline"><div><div className="eyebrow"><i/> PUBLIC BETA · V2 WORKSPACE</div><h1>Strategy Backtester<span>.</span></h1><p>Choose market data, load a Pine strategy, and compare results. Your data stays in your browser.</p></div><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset demo</button></div>
+        <div className="notice"><Info size={17}/><p><strong>Start with your own data.</strong> The built-in candles are synthetic, not real gold history. Market shortcuts open external providers but do not bundle their price data. CSV imports are processed locally. The TradingView TVC:GOLD widget is a visual reference only.</p></div>
+        <nav className="v2-steps" aria-label="Three steps to backtest">
+          <a href="#data-library"><span className="step-no">01</span><div><strong>Find & import data</strong><small>Market shortcuts, CSV import and saved files</small></div><ArrowRight size={16}/></a>
+          <a href="#editor"><span className="step-no">02</span><div><strong>Load your strategy</strong><small>Paste Pine v5/v6 or open a file</small></div><ArrowRight size={16}/></a>
+          <a href="#backtest-settings"><span className="step-no">03</span><div><strong>Run & review results</strong><small>Confirm dates, contract sizes and fees</small></div><ArrowRight size={16}/></a>
+        </nav>
+        <DataLibrary bars={bars} name={name} demo={demo}
+          onImport={files => { csvModeRef.current = 'replace'; void importCsv(files); }}
+          onRestore={(history, label) => applyHistory(history, label)}/>
+
         <section className="data-strip">
-          <div className="instrument"><div className="au-icon">Au</div><div><strong>{dataSource === 'dukascopy' ? 'XAUUSD' : 'TVC:GOLD'} <span>{dataSource === 'dukascopy' ? 'DUKASCOPY BID' : 'REFERENCE'}</span></strong><small>{dataSource === 'dukascopy' ? 'Real historical 15m candles · not TVC:GOLD' : demo ? 'Synthetic demo (NOT TVC:GOLD)' : 'Imported OHLCV · source unverified'}</small></div></div>
+          <div className="instrument"><div className="au-icon">Au</div><div><strong>{demo ? 'Synthetic demonstration' : 'User-imported market data'} <span>{demo ? 'EXAMPLE' : 'UNVERIFIED'}</span></strong><small>{demo ? 'Generated example candles, not real prices' : 'Confirm source, instrument and contract settings'}</small></div></div>
           <div className="strip-item"><small>DATASET</small><strong title={name}>{name}</strong></div>
           <div className="strip-item"><small>AVAILABLE BARS</small><strong>{bars.length.toLocaleString()}</strong></div>
           <div className="strip-item"><small>DATA INTERVAL</small><strong>{interval || '—'}m</strong></div>
           <div className="strip-item coverage-metric"><small>HISTORY AVAILABLE (UTC)</small><strong>{coverage?.first} → {coverage?.last}</strong><small>{coverage?.years.toFixed(2)} calendar years</small></div>
           <input hidden type="file" multiple accept=".csv,text/csv" ref={csvRef} onChange={e => { void importCsv(e.target.files); }}/>
-          <button className="btn primary" disabled={fetchingHistory} onClick={() => { void loadCloudflareHistory(); }}>{fetchingHistory ? loadingProgress || 'Loading 10-year history…' : 'Load 10 years XAUUSD'}</button>
           <button className="btn secondary" onClick={() => { csvModeRef.current = 'replace'; csvRef.current?.click(); }}><UploadCloud size={16}/> Import CSV files</button>
           {!demo && <button className="btn secondary" onClick={() => { csvModeRef.current = 'append'; csvRef.current?.click(); }}>Add more data</button>}
           {HISTORY_URL && <button className="btn secondary" disabled={fetchingHistory} onClick={() => { void loadHostedHistory(); }}>{fetchingHistory ? 'Loading history…' : 'Load hosted history'}</button>}
@@ -349,8 +357,8 @@ export default function App() {
             <div>
               <strong>{coverageIssue ? 'Incomplete selected history' : 'Historical data coverage'}</strong>
               <p>{coverageIssue || ('Loaded candles cover ' + coverage?.first + ' through ' + coverage?.last +
-                ' (' + coverage?.count.toLocaleString() + ' bars). The date picker filters loaded history; it cannot fetch older prices.')}</p>
-              {demo && <p className="demo-history">This is only the October 2026 synthetic demonstration. These trades are not real gold backtest results.</p>}
+                ' (' + coverage?.count.toLocaleString() + ' bars). Dates filter only loaded candles. Import more CSV files to extend the period.')}</p>
+              {demo && <p className="demo-history">These are synthetic prices for learning the interface, not real trading results.</p>}
               {importMessage && <p className="history-import-status">{importMessage}</p>}
             </div>
           </div>
@@ -397,14 +405,14 @@ export default function App() {
           </div>
 
           <div className="rightcol" id="editor">
-            <section className="panel settings-panel"><div className="panel-head"><div><small>CONFIGURATION</small><h2>Backtest setup</h2></div><Settings2 size={18}/></div>
+            <section className="panel settings-panel" id="backtest-settings"><div className="panel-head"><div><small>CONFIGURATION</small><h2>Backtest setup</h2></div><Settings2 size={18}/></div>
               <label>Backtest data source</label><div className="locked-field"><span className="mini-au">Au</span><strong>{dataSource === 'dukascopy' ? 'XAUUSD · BID' : 'IMPORTED:OHLCV'}</strong><span>{dataSource === 'dukascopy' ? 'Dukascopy' : 'Unverified'}</span></div>
               <label htmlFor="tf">Timeframe</label><select id="tf" value={tf} onChange={e => { setTf(Number(e.target.value)); setResults(null); }}>{OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
               <label>Date range <span>UTC / inclusive</span></label><div className="dates"><input type="date" aria-label="Start date" value={start} onChange={e => { setStart(e.target.value); setResults(null); }}/><input type="date" aria-label="End date" value={end} onChange={e => { setEnd(e.target.value); setResults(null); }}/></div>
               <div className="period-presets"><span>Quick range:</span><button onClick={() => preset(1)}>1Y</button><button onClick={() => preset(3)}>3Y</button><button onClick={() => preset(5)}>5Y</button><button onClick={() => preset(10)}>10Y</button><button onClick={() => preset('all')}>All loaded</button></div>
               {coverageIssue && <p className="date-coverage-alert">The chosen dates exceed the loaded dataset. Import older candles before starting the backtest.</p>}
               <div className="bar-count"><ShieldCheck size={14}/>{selection.length.toLocaleString()} complete bars selected</div>
-              <details className="contract-settings" open><summary>Gold contract settings <span>Required for risk sizing</span></summary><p>These are simulation assumptions, not verified TVC:GOLD contract specifications. Match your broker/instrument before comparing P&L.</p>
+              <details className="contract-settings" open><summary>Instrument contract settings <span>Required for position sizing and P&L</span></summary><p>These are simulation assumptions, not verified TVC:GOLD contract specifications. Match your broker/instrument before comparing P&L.</p>
               <div className="contract-fields">
               <label>Point value <input type="number" min="0.000001" step="any" value={contract.pointvalue} onChange={e => { setContract(v => ({ ...v, pointvalue: Number(e.target.value) })); setResults(null); }}/></label>
               <label>Minimum qty/step <input type="number" min="0.000001" step="any" value={contract.mincontract} onChange={e => { setContract(v => ({ ...v, mincontract: Number(e.target.value) })); setResults(null); }}/></label>
@@ -413,7 +421,7 @@ export default function App() {
               <BybitSettingsPanel settings={fees.bybit ?? DEFAULT_BYBIT} preview={feePreview.plan}
                 error={feePreview.error} contract={contract} onChange={updateBybit}/>
               {!fees.bybit?.enabled && <details className="commission-settings" open>
-                <summary>Binance futures commissions <span>Default 0.05% per execution, opening and closing</span></summary>
+                <summary>Generic percentage commissions <span>For percent-based fee assumptions</span></summary>
                 <div className="commission-rate-row">
                   <label htmlFor="fee-rate">Commission per execution (%)</label>
                   <input id="fee-rate" type="number" min="0" max="5" step="0.005" value={fees.percent}
@@ -430,13 +438,13 @@ export default function App() {
                     <strong>{feePreview.error ? 'Fee configuration needs attention' :
                       feePreview.plan?.source === 'pine' ? 'Using Pine Script commission (no double charge)' :
                       feePreview.plan?.overridden ? 'Replacing Pine commission with custom rate' :
-                      'Using configured Binance-style commission'}
+                      'Using configured commission'}
                     </strong>
                     <p>{feePreview.error || feePreview.plan?.description}</p>
                     {feePreview.plan?.source === 'pine' && <small>{feePreview.plan.declaration}</small>}
                   </div>
                 </div>
-                <p className="commission-caveat">Fees are calculated from executed position notional on both entry and exit; rates may differ for Binance maker/taker, VIP level and discounts. Funding is not included. This XAUUSD backtest is not an actual Binance gold instrument.</p>
+                <p className="commission-caveat">Fees are calculated from executed position notional on both entry and exit; rates may differ for Binance maker/taker, VIP level and discounts. Funding is not included. Check that your fee assumptions match the actual instrument.</p>
               </details>}
               <button className="btn run" disabled={running || fetchingHistory || Boolean(coverageIssue) || Boolean(feePreview.error)} onClick={run}>{running ? <span className="spinner"/> : <Play size={17} fill="currentColor"/>}{running ? 'Running strategy…' : 'Run Backtest'}<ArrowRight size={17}/></button>
               {running && <button className="text-button cancel" onClick={() => { stop(); setError('Backtest cancelled.'); }}>Cancel run</button>}
@@ -444,7 +452,7 @@ export default function App() {
             </section>
             <section className="panel code-panel"><div className="tabs"><button className={tab === 'editor' ? 'active' : ''} onClick={() => setTab('editor')}><Code2 size={15}/> Pine editor</button><button className={tab === 'guide' ? 'active' : ''} onClick={() => setTab('guide')}><FolderOpen size={15}/> Data guide</button></div>
               {tab === 'editor' ? <><div className="file-header"><FileCode2 size={15}/><strong>{scriptName}</strong><span>v5 / v6</span></div><textarea spellCheck={false} className="editor" aria-label="Pine Script strategy source" value={code} onChange={e => { setCode(e.target.value); setScriptName('untitled.pine'); setResults(null); }}/><div className="editor-footer"><span>{code.split('\n').length} lines</span><input hidden type="file" accept=".pine,.txt,text/plain" ref={pineRef} onChange={e => { void importPine(e.target.files?.[0]); }}/><button onClick={() => pineRef.current?.click()}><FolderOpen size={14}/> Open .pine</button><button onClick={() => save(code, scriptName, 'text/plain')}><Download size={14}/> Save</button></div><p className="editor-note"><Info size={14}/> Use a <strong>strategy()</strong> script. Some TradingView features are not supported by PineTS.</p></>
-                : <div className="guide"><h3>Ten years of XAUUSD, no terminal</h3><p>On Cloudflare Pages the site build fetches and validates up to ten years of Dukascopy XAUUSD BID 15-minute history. The site loads it automatically when available; you can also click <strong>Load 10 years XAUUSD</strong>. Verify the displayed first and last dates before running a backtest.</p><p>The included source script is your full <strong>Gold Breakout 15M Strategy v1.1.0</strong>, replacing the EMA demonstration. The simulation uses PineTS, so TradingView-specific behavior and order fills can differ. These are <strong>not TVC:GOLD candles</strong>.</p><p>Cloudflare Pages serves assets publicly by default. Protect your project with Cloudflare Access if this data is for personal use only, and check your provider's data rights.</p><a href={REPO + '#cloudflare-data-build'} target="_blank" rel="noreferrer">Data pipeline and privacy details <ArrowUpRight size={14}/></a></div>}
+                : <div className="guide"><h3>Start in three steps</h3><p><strong>1. Find and import historical data.</strong> Choose a market from Data Library, obtain an authorized CSV and drag it onto the importer. You can download the synthetic sample to inspect the expected format.</p><p><strong>2. Open a strategy.</strong> Paste a Pine v5/v6 strategy or upload a .pine file. The included Gold Breakout example is configured for gold; for other markets review broker time, stop distance and sizing.</p><p><strong>3. Backtest and review.</strong> Match the instrument's point value, tick size, quantities, costs and historical dates. Run the strategy, review drawdown and export your trades.</p><p>Saved datasets are stored in this browser, not uploaded. Make a CSV backup because browser storage may be cleared.</p><a href={REPO + '/blob/v2-public/PUBLIC_V2.md'} target="_blank" rel="noreferrer">Public V2 usage guide <ArrowUpRight size={14}/></a></div>}
             </section>
             {error && <div className="error" role="alert"><CircleAlert size={20}/><div><strong>Backtest needs attention</strong><p>{error}</p></div><button onClick={() => setError('')}>×</button></div>}
             {results && results.trades.length === 0 && <section className="zero-diagnostics" role="status"><div className="zero-title"><CircleAlert size={19}/><strong>0 closed trades · diagnostic report</strong></div><p>The engine ran, but did not report closed orders. These checks help distinguish missing price breakouts from unsupported Pine behavior.</p><ul>{results.warnings.slice(0, 6).map((hint, i) => <li key={i}>{hint}</li>)}</ul></section>}
@@ -452,7 +460,7 @@ export default function App() {
             <div className="help-card"><div><Info size={17}/><strong>Research, not execution</strong></div><p>Different gold feeds, tick sizes, spreads and intrabar fills may change results. Validate against a trusted reference before trading.</p><a href={REPO + '#limitations'} target="_blank" rel="noreferrer">Read limitations <ArrowUpRight size={14}/></a></div>
           </div>
         </div>
-        <footer>© 2026 Pine Backtest Studio <span>Powered by PineTS & Lightweight Charts · Not affiliated with TradingView</span></footer>
+        <footer>© 2026 Pine Backtest Studio · V2 Public Beta <span>Powered by PineTS & Lightweight Charts · Not affiliated with TradingView</span></footer>
       </main>
     </div>
   </div>;
