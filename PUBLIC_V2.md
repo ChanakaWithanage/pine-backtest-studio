@@ -1,6 +1,6 @@
 # Pine Backtest Studio V2 — public beta
 
-**V1 is preserved on `v1-stable`. V2 development is on `v2-public`.** The `main` branch is unchanged.
+**V1 is preserved on `v1-stable`. V2's deployment branch is `main`; development history also remains on `v2-public`.**
 
 ## User journey
 1. **Choose data:** pick a favorite market shortcut, obtain an OHLCV CSV from an authorized source, drag it onto the page or use the import button. Built-in synthetic example data is also available for UI exploration.
@@ -21,14 +21,14 @@ V2 `npm run build` **does not download Dukascopy market data**. It refuses to pa
 Public historical data is not included because display/download availability does not imply public redistribution and commercial-use permission. TradingView chart embed is reference-only, not a source of backtesting candles.
 
 ## Cloudflare Pages deployment
-Create a **separate Cloudflare Pages project** for this branch:
+Use your existing **Cloudflare Pages Git deployment** (if linked to this repository) with:
 - Repository: `ChanakaWithanage/pine-backtest-studio`
-- Production branch: `v2-public`
+- Production branch: `main`
 - Build command: `npm run build`
 - Output directory: `dist`
 - Node.js: `22`
 
-Keep the existing Pages project using `main` as V1. This avoids unexpectedly replacing your currently deployed backtester. If you later obtain licensed public datasets, implement a vetted hosted dataset catalog separately.
+The previous V1 is still available on the `v1-stable` branch. Publishing V2 on `main` replaces the existing site's V1 build if Cloudflare Pages deploys `main`. For a separate V1 website, configure another Pages project pointing to `v1-stable`. If you later obtain licensed public datasets, implement a vetted hosted dataset catalog separately.
 
 ## Important limitations
 - PineTS is not TradingView's broker emulator. Verify representative executions against TradingView.
