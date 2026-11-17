@@ -23,8 +23,13 @@ if (!enabled) {
 }
 const base = new Date();
 const end = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate() + 1));
+// Default to ten years. Override only when intentionally building a shorter history.
+const HISTORY_YEARS = Number(process.env.GOLD_HISTORY_YEARS ?? 10);
+if (!Number.isInteger(HISTORY_YEARS) || HISTORY_YEARS < 1 || HISTORY_YEARS > 10) {
+  throw new Error('GOLD_HISTORY_YEARS must be an integer between 1 and 10.');
+}
 const start = new Date(end);
-start.setUTCFullYear(start.getUTCFullYear() - 5);
+start.setUTCFullYear(start.getUTCFullYear() - HISTORY_YEARS);
 if (process.env.GOLD_HISTORY_SMOKE === '1') {
   start.setTime(end.getTime() - 4 * 86_400_000);
 }
@@ -73,7 +78,7 @@ function downloadOne(segment) {
       if (Date.now() > deadline) {
         child.kill('SIGKILL');
         clearInterval(poll);
-        reject(new Error('Five-year download exceeded the Cloudflare build safety deadline.'));
+        reject(new Error('Historical download exceeded the Cloudflare build safety deadline.'));
       }
     }, 2000);
     child.once('close', () => clearInterval(poll));
@@ -112,12 +117,18 @@ async function worker() {
     await downloadOne(segment);
   }
 }
-await Promise.all(Array.from({ length: Math.min(2, segments.length) }, () => worker()));
+await Promise.all(Array.from({ length: Math.min(3, segments.length) }, () => worker()));
 const files = [];
 for (const segment of segments) files.push(await inspect(segment));
 const total = files.reduce((n, f) => n + f.count, 0);
-if (process.env.GOLD_HISTORY_SMOKE !== '1' && total < 90_000) {
-  throw new Error('Only ' + total + ' candles returned. Refusing to label an incomplete download as five-year history.');
+if (process.env.GOLD_HISTORY_SMOKE !== '1' && total < 18_000 * HISTORY_YEARS) {
+  throw new Error('Only ' + total + ' candles returned across ' + HISTORY_YEARS + ' requested years. Refusing to publish incomplete historical coverage.');
+}
+// Prevent a dataset with a large internal count but missing older years being presented as complete.
+if (process.env.GOLD_HISTORY_SMOKE !== '1' &&
+    (files[0].first - start.getTime() > 10 * 86_400_000 ||
+     end.getTime() - files.at(-1).last > 10 * 86_400_000)) {
+  throw new Error('Historical candles do not cover the requested first and last years.');
 }
 const manifest = {
   schemaVersion: 1,

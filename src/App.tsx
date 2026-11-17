@@ -212,7 +212,7 @@ export default function App() {
   }
 
   /**
-   * Load Cloudflare build-generated 5-year historical XAUUSD candles.
+   * Load Cloudflare build-generated 10-year historical XAUUSD candles.
    * Source is Dukascopy BID, never TradingView TVC:GOLD.
    * All bars are validated before marking the dataset ready.
    */
@@ -252,7 +252,7 @@ export default function App() {
       setLoadingProgress('');
     } catch (e) {
       if (seq === historyRequestSeq.current) {
-        setError('Unable to load five-year XAUUSD data: ' +
+        setError('Unable to load ten-year XAUUSD data: ' +
           (e instanceof Error ? e.message : String(e)));
         setLoadingProgress('');
       }
@@ -330,7 +330,7 @@ export default function App() {
       <main className="main">
         <div className="breadcrumb">WORKSPACE <ChevronRight size={13}/> STRATEGY BACKTESTER</div>
         <div className="headline"><div><div className="eyebrow"><i/> EXTENDED HISTORY ENGINE</div><h1>Strategy Backtester<span>.</span></h1><p>Run Pine Script strategies on your own historical data, beyond chart history limits.</p></div><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset demo</button></div>
-        <div className="notice"><Info size={17}/><p><strong>Default strategy: Gold Breakout 15M v1.1.0.</strong> {dataSource === 'dukascopy' ? 'Backtest candles: five-year Dukascopy XAUUSD BID (15m), not TradingView TVC:GOLD.' : dataSource === 'demo' ? 'Loading real gold candles where available. The temporary demo uses synthetic prices, not actual gold.' : 'Custom CSV imported: its source is not verified as TVC:GOLD.'} The TVC:GOLD chart is a reference only; different gold feeds may produce different trade results.</p></div>
+        <div className="notice"><Info size={17}/><p><strong>Default strategy: Gold Breakout 15M v1.1.0.</strong> {dataSource === 'dukascopy' ? 'Backtest candles: ten-year Dukascopy XAUUSD BID (15m), not TradingView TVC:GOLD.' : dataSource === 'demo' ? 'Loading real gold candles where available. The temporary demo uses synthetic prices, not actual gold.' : 'Custom CSV imported: its source is not verified as TVC:GOLD.'} The TVC:GOLD chart is a reference only; different gold feeds may produce different trade results.</p></div>
         <section className="data-strip">
           <div className="instrument"><div className="au-icon">Au</div><div><strong>{dataSource === 'dukascopy' ? 'XAUUSD' : 'TVC:GOLD'} <span>{dataSource === 'dukascopy' ? 'DUKASCOPY BID' : 'REFERENCE'}</span></strong><small>{dataSource === 'dukascopy' ? 'Real historical 15m candles · not TVC:GOLD' : demo ? 'Synthetic demo (NOT TVC:GOLD)' : 'Imported OHLCV · source unverified'}</small></div></div>
           <div className="strip-item"><small>DATASET</small><strong title={name}>{name}</strong></div>
@@ -338,7 +338,7 @@ export default function App() {
           <div className="strip-item"><small>DATA INTERVAL</small><strong>{interval || '—'}m</strong></div>
           <div className="strip-item coverage-metric"><small>HISTORY AVAILABLE (UTC)</small><strong>{coverage?.first} → {coverage?.last}</strong><small>{coverage?.years.toFixed(2)} calendar years</small></div>
           <input hidden type="file" multiple accept=".csv,text/csv" ref={csvRef} onChange={e => { void importCsv(e.target.files); }}/>
-          <button className="btn primary" disabled={fetchingHistory} onClick={() => { void loadCloudflareHistory(); }}>{fetchingHistory ? loadingProgress || 'Loading 5-year history…' : 'Load 5 years XAUUSD'}</button>
+          <button className="btn primary" disabled={fetchingHistory} onClick={() => { void loadCloudflareHistory(); }}>{fetchingHistory ? loadingProgress || 'Loading 10-year history…' : 'Load 10 years XAUUSD'}</button>
           <button className="btn secondary" onClick={() => { csvModeRef.current = 'replace'; csvRef.current?.click(); }}><UploadCloud size={16}/> Import CSV files</button>
           {!demo && <button className="btn secondary" onClick={() => { csvModeRef.current = 'append'; csvRef.current?.click(); }}>Add more data</button>}
           {HISTORY_URL && <button className="btn secondary" disabled={fetchingHistory} onClick={() => { void loadHostedHistory(); }}>{fetchingHistory ? 'Loading history…' : 'Load hosted history'}</button>}
@@ -401,7 +401,7 @@ export default function App() {
               <label>Backtest data source</label><div className="locked-field"><span className="mini-au">Au</span><strong>{dataSource === 'dukascopy' ? 'XAUUSD · BID' : 'IMPORTED:OHLCV'}</strong><span>{dataSource === 'dukascopy' ? 'Dukascopy' : 'Unverified'}</span></div>
               <label htmlFor="tf">Timeframe</label><select id="tf" value={tf} onChange={e => { setTf(Number(e.target.value)); setResults(null); }}>{OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
               <label>Date range <span>UTC / inclusive</span></label><div className="dates"><input type="date" aria-label="Start date" value={start} onChange={e => { setStart(e.target.value); setResults(null); }}/><input type="date" aria-label="End date" value={end} onChange={e => { setEnd(e.target.value); setResults(null); }}/></div>
-              <div className="period-presets"><span>Quick range:</span><button onClick={() => preset(1)}>1Y</button><button onClick={() => preset(3)}>3Y</button><button onClick={() => preset(5)}>5Y</button><button onClick={() => preset('all')}>All loaded</button></div>
+              <div className="period-presets"><span>Quick range:</span><button onClick={() => preset(1)}>1Y</button><button onClick={() => preset(3)}>3Y</button><button onClick={() => preset(5)}>5Y</button><button onClick={() => preset(10)}>10Y</button><button onClick={() => preset('all')}>All loaded</button></div>
               {coverageIssue && <p className="date-coverage-alert">The chosen dates exceed the loaded dataset. Import older candles before starting the backtest.</p>}
               <div className="bar-count"><ShieldCheck size={14}/>{selection.length.toLocaleString()} complete bars selected</div>
               <details className="contract-settings" open><summary>Gold contract settings <span>Required for risk sizing</span></summary><p>These are simulation assumptions, not verified TVC:GOLD contract specifications. Match your broker/instrument before comparing P&L.</p>
@@ -444,7 +444,7 @@ export default function App() {
             </section>
             <section className="panel code-panel"><div className="tabs"><button className={tab === 'editor' ? 'active' : ''} onClick={() => setTab('editor')}><Code2 size={15}/> Pine editor</button><button className={tab === 'guide' ? 'active' : ''} onClick={() => setTab('guide')}><FolderOpen size={15}/> Data guide</button></div>
               {tab === 'editor' ? <><div className="file-header"><FileCode2 size={15}/><strong>{scriptName}</strong><span>v5 / v6</span></div><textarea spellCheck={false} className="editor" aria-label="Pine Script strategy source" value={code} onChange={e => { setCode(e.target.value); setScriptName('untitled.pine'); setResults(null); }}/><div className="editor-footer"><span>{code.split('\n').length} lines</span><input hidden type="file" accept=".pine,.txt,text/plain" ref={pineRef} onChange={e => { void importPine(e.target.files?.[0]); }}/><button onClick={() => pineRef.current?.click()}><FolderOpen size={14}/> Open .pine</button><button onClick={() => save(code, scriptName, 'text/plain')}><Download size={14}/> Save</button></div><p className="editor-note"><Info size={14}/> Use a <strong>strategy()</strong> script. Some TradingView features are not supported by PineTS.</p></>
-                : <div className="guide"><h3>Five years of XAUUSD, no terminal</h3><p>On Cloudflare Pages the site build fetches and validates up to five years of Dukascopy XAUUSD BID 15-minute history. The site loads it automatically when available; you can also click <strong>Load 5 years XAUUSD</strong>. Verify the displayed first and last dates before running a backtest.</p><p>The included source script is your full <strong>Gold Breakout 15M Strategy v1.1.0</strong>, replacing the EMA demonstration. The simulation uses PineTS, so TradingView-specific behavior and order fills can differ. These are <strong>not TVC:GOLD candles</strong>.</p><p>Cloudflare Pages serves assets publicly by default. Protect your project with Cloudflare Access if this data is for personal use only, and check your provider's data rights.</p><a href={REPO + '#cloudflare-data-build'} target="_blank" rel="noreferrer">Data pipeline and privacy details <ArrowUpRight size={14}/></a></div>}
+                : <div className="guide"><h3>Ten years of XAUUSD, no terminal</h3><p>On Cloudflare Pages the site build fetches and validates up to ten years of Dukascopy XAUUSD BID 15-minute history. The site loads it automatically when available; you can also click <strong>Load 10 years XAUUSD</strong>. Verify the displayed first and last dates before running a backtest.</p><p>The included source script is your full <strong>Gold Breakout 15M Strategy v1.1.0</strong>, replacing the EMA demonstration. The simulation uses PineTS, so TradingView-specific behavior and order fills can differ. These are <strong>not TVC:GOLD candles</strong>.</p><p>Cloudflare Pages serves assets publicly by default. Protect your project with Cloudflare Access if this data is for personal use only, and check your provider's data rights.</p><a href={REPO + '#cloudflare-data-build'} target="_blank" rel="noreferrer">Data pipeline and privacy details <ArrowUpRight size={14}/></a></div>}
             </section>
             {error && <div className="error" role="alert"><CircleAlert size={20}/><div><strong>Backtest needs attention</strong><p>{error}</p></div><button onClick={() => setError('')}>×</button></div>}
             {results && results.trades.length === 0 && <section className="zero-diagnostics" role="status"><div className="zero-title"><CircleAlert size={19}/><strong>0 closed trades · diagnostic report</strong></div><p>The engine ran, but did not report closed orders. These checks help distinguish missing price breakouts from unsupported Pine behavior.</p><ul>{results.warnings.slice(0, 6).map((hint, i) => <li key={i}>{hint}</li>)}</ul></section>}

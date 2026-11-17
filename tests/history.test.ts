@@ -12,7 +12,7 @@ test('missing January history is rejected instead of backtesting only October', 
   const bars = [bar('2026-10-05T00:00:00Z'), bar('2026-10-05T00:15:00Z')];
   const error = checkRequestedCoverage(bars, '2026-01-01', '2026-11-16');
   assert.match(error || '', /only covers 2026-10-05/);
-  assert.match(error || '', /Import 5-year/);
+  assert.match(error || '', /Import older historical data/);
 });
 
 test('accepts complete requested period inside available history', () => {
@@ -48,4 +48,10 @@ test('detects mixed source intervals and reports coverage', () => {
 test('5-year date preset is anchored to the latest available candle', () => {
   const bars = [bar('2021-11-16T00:00:00Z'), bar('2026-11-16T13:00:00Z')];
   assert.deepEqual(pastYearsFromLastCandle(bars, 5), { start: '2021-11-16', end: '2026-11-16' });
+});
+
+
+test('10-year date preset is anchored to the latest available candle', () => {
+  const bars = [bar('2016-11-17T00:00:00Z'), bar('2026-11-17T13:00:00Z')];
+  assert.deepEqual(pastYearsFromLastCandle(bars, 10), { start: '2016-11-17', end: '2026-11-17' });
 });

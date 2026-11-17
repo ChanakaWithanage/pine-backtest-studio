@@ -99,7 +99,7 @@ export function checkRequestedCoverage(candles: Candle[], start: string, end: st
   const last = utcDay(candles[candles.length - 1].time);
   if (start < first || end > last) {
     return 'Requested ' + start + ' to ' + end + ', but loaded data only covers ' +
-      first + ' to ' + last + '. The date picker cannot fetch missing candles. Import 5-year historical data before running this range.';
+      first + ' to ' + last + '. The date picker cannot fetch missing candles. Import older historical data before running this range.';
   }
   return null;
 }

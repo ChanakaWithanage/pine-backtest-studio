@@ -25,7 +25,7 @@ export function parseHostedManifest(value: unknown): HostedHistoryManifest {
   if (manifest.schemaVersion !== 1 || manifest.instrument !== 'XAUUSD' ||
       manifest.provider !== 'Dukascopy' || manifest.priceType !== 'bid' ||
       manifest.timeframeMinutes !== 15 || !Array.isArray(manifest.files) ||
-      manifest.files.length < 1 || manifest.files.length > 7 ||
+      manifest.files.length < 1 || manifest.files.length > 14 ||
       typeof manifest.candleCount !== 'number') {
     throw new Error('Unrecognized XAUUSD history manifest.');
   }

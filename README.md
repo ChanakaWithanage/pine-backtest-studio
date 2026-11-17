@@ -2,7 +2,7 @@
 
 ## Exact TVC:GOLD requirement
 
-The strategy must be tested against **TradingView's calculated TVC:GOLD feed**, not generic XAUUSD, a broker CFD, Dukascopy XAUUSD, or COMEX futures. The project is not yet capable of five years of authentic 15-minute TVC:GOLD backtesting, because it lacks an authorized historical TVC:GOLD data feed.
+The strategy must be tested against **TradingView's calculated TVC:GOLD feed**, not generic XAUUSD, a broker CFD, Dukascopy XAUUSD, or COMEX futures. The project is not yet capable of ten years of authentic 15-minute TVC:GOLD backtesting, because it lacks an authorized historical TVC:GOLD data feed.
 
 TradingView confirms that its TVC symbols are calculated by TradingView and may differ from otherwise similar instruments. Its free widget can display TVC:GOLD but does not expose candles to our independent strategy engine; TradingView's terms prohibit unauthorized data extraction and non-display processing. Use TVC:GOLD in TradingView's own backtesting tools, or arrange a separate permission/license allowing external backtests using this exact source. **Do not assume a chart CSV export grants rights for third-party automated processing.**
 
@@ -10,7 +10,7 @@ The legacy optional XAUUSD downloader remains available only for separate resear
 
 ---
 
-A browser-based Pine Script strategy backtesting workspace. The **requested target is TradingView TVC:GOLD**, 15-minute candles across five years. The app currently **does not have this exact historical feed**; its live TradingView widget is display-only and imported OHLCV data is explicitly unverified. It must not be presented as an authentic TVC:GOLD backtest.
+A browser-based Pine Script strategy backtesting workspace. The **requested target is TradingView TVC:GOLD**, 15-minute candles across ten years. The app currently **does not have this exact historical feed**; its live TradingView widget is display-only and imported OHLCV data is explicitly unverified. It must not be presented as an authentic TVC:GOLD backtest.
 
 **Stack:** React 19, TypeScript, Vite, PineTS, TradingView Lightweight Charts. Static frontend; no backend or API key required.
 
@@ -38,7 +38,7 @@ npm install
 npm run dev
 ~~~
 
-Open the URL Vite prints (usually http://localhost:5173). The app opens your full **Gold Breakout 15M Strategy v1.1.0** as the default source. On Cloudflare Pages it automatically loads the generated five-year XAUUSD candles. Local development without the hosted-data build still starts with a clearly labeled synthetic demo.
+Open the URL Vite prints (usually http://localhost:5173). The app opens your full **Gold Breakout 15M Strategy v1.1.0** as the default source. On Cloudflare Pages it automatically loads the generated ten-year XAUUSD candles. Local development without the hosted-data build still starts with a clearly labeled synthetic demo.
 
 **Tests and build**
 
@@ -51,13 +51,13 @@ The compiled static site is in dist/. Cloudflare Pages: **Build command** npm ru
 
 ## Historical gold data: optional manual workflow
 
-**Cloudflare users need no terminal or local clone.** The hosted build handles the five-year data import automatically. The following CLI is only an optional method for developers who run the project locally, using [dukascopy-node](https://www.dukascopy-node.app/quick-start).
+**Cloudflare users need no terminal or local clone.** The hosted build handles the ten-year data import automatically. The following CLI is only an optional method for developers who run the project locally, using [dukascopy-node](https://www.dukascopy-node.app/quick-start).
 
 ~~~bash
 npm run download:gold
 
 # Optional exact UTC range (upper bound exclusive):
-npm run download:gold -- 2021-11-16 2026-11-17 m15
+npm run download:gold -- 2016-11-17 2026-11-18 m15
 ~~~
 
 With no arguments, this runs the CLI for the latest five calendar years, at 15-minute resolution, up to tomorrow 00:00 UTC (the end bound is exclusive). It requests XAUUSD **bid** OHLCV, enables caching/retries/rate pacing, and saves a CSV in the ignored local **data/** directory. The download can take considerable time and depends on the provider being reachable. Select the resulting CSV in the **Import CSV files** control; no historical data is bundled or downloaded merely by changing the date picker.
@@ -76,7 +76,7 @@ timestamp,open,high,low,close,volume
 - Required columns: timestamp (or time/date), open, high, low, close. volume is optional.
 - Data is sorted by timestamp; duplicate timestamps and invalid OHLC values are rejected.
 - Gaps are not filled with invented prices. Aggregating intervals drops incomplete groups.
-- Browser import limits: 75 MB per CSV, 90 MB combined in a single selection, 400,000 merged bars. Five years of 15-minute gold history normally fits, but a five-year 1-minute dataset might not.
+- Browser import limits: 75 MB per CSV, 90 MB combined in a single selection, 400,000 merged bars. Ten years of 15-minute gold history normally fits, but a ten-year 1-minute dataset might not.
 - Import several same-interval CSV files at once; the app sorts and deduplicates exact overlapping candles. It refuses conflicting overlapping bars, which may indicate a mixed price feed.
 - **Add more data** merges further files into an existing imported dataset without discarding prior years.
 - **Actual available history is shown prominently** in UTC, along with the number of bars and time span. Date-range presets (1Y / 3Y / 5Y / All loaded) are anchored to the most recent loaded bar.
@@ -86,7 +86,7 @@ timestamp,open,high,low,close,volume
 
 
 
-### Making five-year history available on a Cloudflare Pages website
+### Making ten-year history available on a Cloudflare Pages website
 
 The GitHub repository contains **no committed gold candles**. However, when Cloudflare Pages builds the site, its prebuild hook downloads approximately five calendar years of real Dukascopy XAUUSD BID candles and includes them in the published site assets. If the build fails, no new dataset is deployed.
 
@@ -96,9 +96,9 @@ To offer a **preloaded** dataset to every visitor, first obtain a historical dat
 
 Dukascopy permits historical data export for research, but its general site terms restrict some republishing and commercial uses. The library's open-source license does **not** grant redistribution rights to the underlying market data. Do not upload Dukascopy's bulk dataset to a public site without confirming rights with the provider.
 
-### Running a five-year backtest
+### Running a ten-year backtest
 
-A five-year XAUUSD m15 CSV commonly includes around 120,000–130,000 session candles. The data import supports this size, but full PineTS execution speed and memory usage depend on the complexity of the script and browser hardware. Start by verifying a one-year overlapping period against TradingView, and increase to five years after checking correct data coverage, session timezone, and strategy order size. There is no 19-trade cap in the software.
+A ten-year XAUUSD m15 CSV commonly includes around 230,000–260,000 session candles. The data import supports this size, but full PineTS execution speed and memory usage depend on the complexity of the script and browser hardware. Start by verifying a one-year overlapping period against TradingView, and increase to ten years after checking correct data coverage, session timezone, and strategy order size. There is no 19-trade cap in the software.
 
 
 
@@ -175,15 +175,15 @@ These analytics use **realized net P&L from PineTS closed trades**. They are not
 
 **TradingView comparison:** These calculations are reproducible but do **not necessarily match TradingView's native Sharpe or Sortino**, which can use different return sampling, risk-free reference rates, account equity, and execution rules. Normalize assumptions before comparing platforms.
 
-**Performance:** Insights aggregate the completed trades, not every bar of the 5-year input file. The page shows an explanatory placeholder until a backtest completes.
+**Performance:** Insights aggregate the completed trades, not every bar of the 10-year input file. The page shows an explanatory placeholder until a backtest completes.
 
 ## Cloudflare data build: no cloning or terminal required
 
 When this project deploys through Git integration to Cloudflare Pages, npm's prebuild hook automatically requests five calendar years of Dukascopy **XAUUSD BID 15-minute candles**. The current date is used for the rolling range (for example, Nov 2021–Nov 2026). The downloader creates yearly CSV chunks and a manifest in the temporary Cloudflare build directory. Vite publishes them with the site, **without adding price data to the public GitHub repository**.
 
-The browser automatically reads /history/manifest.json, validates the reported counts/timestamps for each yearly file, combines them, and selects the full available range. If auto-loading fails, click **Load 5 years XAUUSD** to retry. Never confuse this source with TradingView TVC:GOLD; the latter is display-only.
+The browser automatically reads /history/manifest.json, validates the reported counts/timestamps for each yearly file, combines them, and selects the full available range. If auto-loading fails, click **Load 10 years XAUUSD** to retry. Never confuse this source with TradingView TVC:GOLD; the latter is display-only.
 
-**Default Pine strategy:** The actual *Gold Breakout 15M Strategy v1.1.0* from the project's published source file (samples/gold-breakout-15m.pine). The former EMA strategy is retained only as a unit-test fixture. PineTS does not guarantee compatibility with every Pine Script feature, so a five-year backtest still needs verification.
+**Default Pine strategy:** The actual *Gold Breakout 15M Strategy v1.1.0* from the project's published source file (samples/gold-breakout-15m.pine). The former EMA strategy is retained only as a unit-test fixture. PineTS does not guarantee compatibility with every Pine Script feature, so a ten-year backtest still needs verification.
 
 ### Privacy and provider terms
 
@@ -193,7 +193,7 @@ Dukascopy's [website terms](https://www.dukascopy.com/swiss/english/legal-pages/
 
 ### Cloudflare build-time limitation
 
-Cloudflare Pages' build limit is **20 minutes**. Five years requires substantial requests and may fail because of timeout, a provider 403/WAF response, or rate limiting. If fetching fails, this build fails instead of pretending that synthetic data is a real five-year backtest; a previously deployed app remains available. The script logs each yearly download, verifies timestamps and candle counts, and rejects incomplete results (under 90,000 15m candles).
+Cloudflare Pages' build limit is **20 minutes**. Ten years requires substantial requests and may fail because of timeout, a provider 403/WAF response, or rate limiting. If fetching fails, this build fails instead of pretending that synthetic data is a real ten-year backtest; a previously deployed app remains available. The script logs each yearly download, verifies timestamps and candle counts, and rejects incomplete results (under 90,000 15m candles).
 
 In a normal local/GitHub CI build without CF_PAGES=1, this expensive download is skipped. To test the downloader explicitly, set GOLD_HISTORY_SMOKE=1 and GOLD_HISTORY_BUILD=1 in a CI job. Static assets are limited to 25 MiB each; the dataset is split by calendar year.
 
@@ -201,7 +201,7 @@ For continuing daily data, Cloudflare Pages rebuilds from GitHub when you push c
 
 ## Run your own Pine strategy
 
-1. On the Cloudflare site, the real five-year XAUUSD history is requested automatically. If necessary click **Load 5 years XAUUSD**. CSV import is optional.
+1. On the Cloudflare site, the real ten-year XAUUSD history is requested automatically. If necessary click **Load 10 years XAUUSD**. CSV import is optional.
 2. Select a valid date range and timeframe. The source interval must divide the selected output interval.
 3. Paste Pine Script into the **Pine editor** or load a .pine file. It must declare strategy(), not indicator().
 4. Click **Run Backtest**. Closed trades and simulated performance appear below the chart.
