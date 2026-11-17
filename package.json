@@ -6,7 +6,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/prepare-hosted-history.mjs",
+    "prebuild": "node scripts/public-build-guard.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
