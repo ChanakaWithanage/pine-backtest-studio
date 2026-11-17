@@ -23,6 +23,21 @@ function parseRow(line: string, separator: string): string[] {
 export function parseTimestamp(value: string): number {
   const source = value.trim();
   if (!source) return NaN;
+  // Dukascopy/MetaTrader exports often use European day.month.year UTC timestamps.
+  const dmy = /^(\d{2})\.(\d{2})\.(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?$/.exec(source);
+  const ymd = /^(\d{4})\.(\d{2})\.(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?$/.exec(source);
+  if (dmy || ymd) {
+    const part = dmy ?? ymd!;
+    const y = Number(part[dmy ? 3 : 1]);
+    const m = Number(part[2]);
+    const d = Number(part[dmy ? 1 : 3]);
+    const hours = Number(part[4] ?? 0), minutes = Number(part[5] ?? 0), seconds = Number(part[6] ?? 0);
+    const ms = Number((part[7] ?? '').padEnd(3, '0'));
+    const timestamp = Date.UTC(y, m - 1, d, hours, minutes, seconds, ms);
+    const checked = new Date(timestamp);
+    return checked.getUTCFullYear() === y && checked.getUTCMonth() === m - 1 && checked.getUTCDate() === d &&
+      checked.getUTCHours() === hours && checked.getUTCMinutes() === minutes && checked.getUTCSeconds() === seconds ? timestamp : NaN;
+  }
   if (/^\d{10,16}$/.test(source)) {
     const n = Number(source);
     return source.length <= 10 ? n * 1000 : n;
@@ -42,7 +57,7 @@ export function parseCsv(text: string, maxRows = 400_000): Candle[] {
   const header = parseRow(lines[0], delimiter).map(s => s.toLowerCase().replace(/[^a-z0-9]/g, ''));
   const column = (names: string[]) => names.map(n => header.indexOf(n)).find(i => i !== -1) ?? -1;
   const indices = {
-    time: column(['timestamp', 'time', 'datetime', 'date', 'opentime']),
+    time: column(['timestamp', 'gmttime', 'timeutc', 'datetime', 'opentime', 'time', 'date']),
     open: column(['open']), high: column(['high']), low: column(['low']),
     close: column(['close']), volume: column(['volume', 'vol'])
   };
@@ -50,11 +65,17 @@ export function parseCsv(text: string, maxRows = 400_000): Candle[] {
     throw new Error('CSV must have timestamp/time/date, open, high, low and close columns.');
   }
 
+  // Some brokers export a Date column and a separate Time column.
+  const dateIndex = header.indexOf('date');
+  const timeIndex = header.indexOf('time');
+  const splitDateTime = dateIndex >= 0 && timeIndex >= 0 && indices.time === timeIndex;
   const candles: Candle[] = [];
   for (let rowIndex = 1; rowIndex < lines.length; rowIndex += 1) {
     const cells = parseRow(lines[rowIndex], delimiter);
     const candle: Candle = {
-      time: parseTimestamp(cells[indices.time] ?? ''),
+      time: parseTimestamp(splitDateTime
+        ? (cells[dateIndex] ?? '') + ' ' + (cells[timeIndex] ?? '')
+        : (cells[indices.time] ?? '')),
       open: Number(cells[indices.open]),
       high: Number(cells[indices.high]),
       low: Number(cells[indices.low]),
