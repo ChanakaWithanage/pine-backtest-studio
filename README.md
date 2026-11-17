@@ -1,3 +1,19 @@
+# Pine Backtest Studio — Public V2
+
+V2 is the public-facing browser backtester. The **previous V1** is preserved on the [`v1-stable` branch](https://github.com/ChanakaWithanage/pine-backtest-studio/tree/v1-stable). The `v2-public` branch retains the release development history; `main` is the deployment branch.
+
+**Get started:** (1) use Data Library to import a permitted OHLCV CSV, (2) open or edit a Pine strategy, (3) set dates, instrument sizing and execution costs, and run the backtest. You can pin market-data provider shortcuts, save imported datasets in the browser, and export CSV backups.
+
+**Public data policy:** V2 does not automatically fetch or serve Dukascopy or TradingView candle history. The built-in dataset is synthetic demonstration data. Market-data downloads must be obtained independently under appropriate usage rights.
+
+**Deploy:** Cloudflare Pages, production branch `main`, build command `npm run build`, output `dist`, Node.js 22. See [Public V2 guide](PUBLIC_V2.md).
+
+---
+
+## Archived V1 documentation (below)
+
+The sections below describe the original private research workflow and its historical-data build, **not** the current public V2 behavior. The V1 implementation remains available at [`v1-stable`](https://github.com/ChanakaWithanage/pine-backtest-studio/tree/v1-stable).
+
 # Pine Backtest Studio
 
 ## Exact TVC:GOLD requirement
