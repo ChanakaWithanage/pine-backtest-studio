@@ -20,3 +20,20 @@ test('downloaded CSV can be imported without altering candle OHLCV', () => {
   const parsed = parseCsv(exportCandles(data));
   assert.deepEqual(parsed, data);
 });
+
+test('imports Dukascopy GMT time and European day.month.year timestamps', () => {
+  const text = 'Gmt time,Open,High,Low,Close,Volume\n' +
+    '17.11.2016 10:00:00.000,1200,1201,1199,1200.5,100\n' +
+    '17.11.2016 10:15:00.000,1200.5,1202,1200,1201,120\n';
+  const candles = parseCsv(text);
+  assert.equal(candles[0].time, Date.UTC(2016, 10, 17, 10));
+  assert.equal(candles[1].time, Date.UTC(2016, 10, 17, 10, 15));
+});
+test('imports split date and time columns in broker CSV', () => {
+  const text = 'Date,Time,Open,High,Low,Close,Volume\n' +
+    '2016.11.17,10:00:00,1200,1201,1199,1200.5,100\n' +
+    '2016.11.17,10:15:00,1200.5,1202,1200,1201,120\n';
+  const candles = parseCsv(text);
+  assert.equal(candles[0].time, Date.UTC(2016, 10, 17, 10));
+  assert.equal(candles[1].time, Date.UTC(2016, 10, 17, 10, 15));
+});
