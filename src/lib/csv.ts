@@ -78,6 +78,13 @@ export function parseCsv(text: string, maxRows = 400_000): Candle[] {
   return candles;
 }
 
+/** Portable data backup for privately imported or synthetic candles. */
+export function exportCandles(candles: Candle[]): string {
+  const rows = ['timestamp,open,high,low,close,volume'];
+  for (const c of candles) rows.push([c.time, c.open, c.high, c.low, c.close, c.volume].join(','));
+  return rows.join('\n') + '\n';
+}
+
 export function inferIntervalMinutes(candles: Candle[]): number {
   if (candles.length < 2) return 0;
   const counts = new Map<number, number>();
