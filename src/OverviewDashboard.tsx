@@ -73,14 +73,14 @@ export default function OverviewDashboard({ results, demo }: { results: Results 
       <span className={'db-run-state ' + (results ? 'is-ready' : '')}><span/>{results ? (demo ? 'Demo results' : 'Backtest complete') : 'Ready for your first run'}</span>
     </div>
     <div className="db-stats">
-      <MiniStat title="Total trades" value={results ? trades.toLocaleString() : '—'} sub={results ? analytics!.longs.count + ' long · ' + analytics!.shorts.count + ' short' : 'Completed positions'}/>
-      <MiniStat title="Win rate" value={results ? numeral(results.winRate, 1) + '%' : '—'} sub={results ? analytics!.winners + ' wins · ' + analytics!.losers + ' losses' : 'Winning trades'}/>
       <MiniStat title="Net profit / loss" value={results ? currency(results.netProfit) : '—'} sub={results ? numeral(results.netProfit / (results.initialCapital || 1) * 100, 2) + '% of starting balance' : 'Realized return'} tone={results && results.netProfit < 0 ? 'red' : 'green'}/>
+      <MiniStat title="Win rate" value={results ? numeral(results.winRate, 1) + '%' : '—'} sub={results ? analytics!.winners + ' wins · ' + analytics!.losers + ' losses' : 'Winning trades'}/>
       <MiniStat title="Profit factor" value={results ? results.profitFactor == null ? 'N/A' : numeral(results.profitFactor) : '—'} sub="Gross profit / gross loss" tone="amber"/>
-      <MiniStat title="Max drawdown" value={results ? currency(results.maxDrawdown) : '—'} sub="PineTS reported" tone="red"/>
-      <MiniStat title="Sharpe ratio" value={results ? numeral(analytics!.sharpe) : '—'} sub="Risk-adjusted returns" tone="amber"/>
-      <MiniStat title="Avg win / avg loss" value={results ? currency(analytics!.averageWin) : '—'} sub={results ? 'Loss ' + currency(analytics!.averageLoss) : 'Trade payoff'}/>
       <MiniStat title="Expectancy / trade" value={results ? currency(analytics!.expectancy) : '—'} sub="Average realized P&L" tone={results && (analytics?.expectancy ?? 0) < 0 ? 'red' : 'green'}/>
+      <MiniStat title="Total trades" value={results ? trades.toLocaleString() : '—'} sub={results ? analytics!.longs.count + ' long · ' + analytics!.shorts.count + ' short' : 'Completed positions'}/>
+      <MiniStat title="Max drawdown" value={results ? currency(results.maxDrawdown) : '—'} sub="PineTS reported" tone="red"/>
+      <MiniStat title="Avg win / avg loss" value={results ? currency(analytics!.averageWin) : '—'} sub={results ? 'Loss ' + currency(analytics!.averageLoss) : 'Trade payoff'}/>
+      <MiniStat title="Sharpe ratio" value={results ? numeral(analytics!.sharpe) : '—'} sub="Risk-adjusted returns" tone="amber"/>
     </div>
     <div className="db-main-charts">
       <article className="db-panel"><div className="db-panel-head"><h3><TrendingUp size={17}/> Balance curve</h3><span>{results ? currency(results.initialCapital + results.netProfit) : 'Waiting for results'}</span></div><BalanceChart results={results}/></article>
