@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ArrowUpRight, BarChart3, Check, ChevronRight, CircleAlert, Clock3, Code2, Download, FileCode2, FileDown, FolderOpen, Github, Info, Layers3, Play, RotateCcw, Settings2, ShieldCheck, UploadCloud } from 'lucide-react';
+import { Activity, ArrowRight, ArrowUpRight, BarChart3, ChartNoAxesCombined, Check, ChevronRight, CircleAlert, Clock3, Code2, Database, Download, FileCode2, FileDown, FolderOpen, Github, Info, Layers3, List, Play, RotateCcw, Settings2, ShieldCheck, UploadCloud } from 'lucide-react';
 import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, type UTCTimestamp } from 'lightweight-charts';
 import { createDemoCandles } from './lib/demo';
 import GoldBreakoutSource from '../samples/gold-breakout-15m.pine?raw';
 import BacktestAnalysis from './BacktestAnalysis';
 import DataLibrary from './DataLibrary';
+import OverviewDashboard from './OverviewDashboard';
 import { DEFAULT_CONTRACT } from './lib/csv-provider';
 import { DEFAULT_FEES, DEFAULT_BYBIT, planExecutionCosts, type FeeSettings, type BybitSettings } from './lib/commissions';
 import { BybitSettingsPanel, BybitResultsPanel } from './BybitComponents';
@@ -324,22 +325,29 @@ export default function App() {
   }
 
   return <div className="app">
-    <aside className="rail"><div className="rail-brand"><Layers3 size={25}/></div><div className="rail-links"><span className="rail-link active" title="Backtesting"><BarChart3 size={20}/></span><button className="rail-link" title="Pine editor" onClick={() => { setTab('editor'); document.getElementById('editor')?.scrollIntoView({ behavior: 'smooth' }); }}><Code2 size={20}/></button><button className="rail-link" title="Data setup" onClick={() => { setTab('guide'); document.getElementById('editor')?.scrollIntoView({ behavior: 'smooth' }); }}><Settings2 size={20}/></button></div><a className="rail-link rail-github" target="_blank" rel="noreferrer" href={REPO} title="GitHub"><Github size={20}/></a></aside>
+    <aside className="rail" aria-label="Workspace navigation">
+      <a className="rail-identity" href="#dashboard"><span className="rail-brand"><Layers3 size={23}/></span><span className="rail-identity-name">Pine Backtest<small>STUDIO · V2</small></span></a>
+      <nav className="rail-links" aria-label="Sections">
+        <span className="rail-group">OVERVIEW</span>
+        <a className="rail-link active" href="#dashboard" title="Dashboard"><BarChart3 size={18}/><span>Dashboard</span></a>
+        <a className="rail-link" href="#chart" title="Market chart"><Activity size={18}/><span>Market chart</span></a>
+        <a className="rail-link" href="#trades" title="Trades"><List size={18}/><span>Trades</span></a>
+        <span className="rail-group">ANALYZE</span>
+        <a className="rail-link" href="#analysis" title="Advanced analysis"><ChartNoAxesCombined size={18}/><span>Analysis</span></a>
+        <span className="rail-group">SETUP</span>
+        <a className="rail-link" href="#data-library" title="Data library"><Database size={18}/><span>Data library</span></a>
+        <a className="rail-link" href="#backtest-settings" title="Backtest settings"><Settings2 size={18}/><span>Settings</span></a>
+        <a className="rail-link" href="#editor" onClick={() => setTab('editor')} title="Pine editor"><Code2 size={18}/><span>Pine editor</span></a>
+      </nav>
+      <a className="rail-link rail-github" target="_blank" rel="noreferrer" href={REPO} title="GitHub project"><Github size={18}/><span>GitHub</span></a>
+    </aside>
     <div className="content-shell">
       <header className="topbar"><div className="brand"><Layers3 size={20}/><strong>PINE<span>BACKTEST</span></strong><small>STUDIO · V2 BETA</small></div><div className="header-right"><span className="local"><i/> LOCAL RESEARCH WORKSPACE</span><a href={REPO} target="_blank" rel="noreferrer"><Github size={16}/> GitHub <ArrowUpRight size={14}/></a></div></header>
       <main className="main">
-        <div className="breadcrumb">WORKSPACE <ChevronRight size={13}/> STRATEGY BACKTESTER</div>
-        <div className="headline"><div><div className="eyebrow"><i/> PUBLIC BETA · V2 WORKSPACE</div><h1>Strategy Backtester<span>.</span></h1><p>Choose market data, load a Pine strategy, and compare results. Your data stays in your browser.</p></div><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset demo</button></div>
-        <div className="notice"><Info size={17}/><p><strong>Start with your own data.</strong> The built-in candles are synthetic, not real gold history. Market shortcuts open external providers but do not bundle their price data. CSV imports are processed locally. The TradingView TVC:GOLD widget is a visual reference only.</p></div>
-        <nav className="v2-steps" aria-label="Three steps to backtest">
-          <a href="#data-library"><span className="step-no">01</span><div><strong>Find & import data</strong><small>Market shortcuts, CSV import and saved files</small></div><ArrowRight size={16}/></a>
-          <a href="#editor"><span className="step-no">02</span><div><strong>Load your strategy</strong><small>Paste Pine v5/v6 or open a file</small></div><ArrowRight size={16}/></a>
-          <a href="#backtest-settings"><span className="step-no">03</span><div><strong>Run & review results</strong><small>Confirm dates, contract sizes and fees</small></div><ArrowRight size={16}/></a>
-        </nav>
-        <DataLibrary bars={bars} name={name} demo={demo}
-          onImport={files => { csvModeRef.current = 'replace'; void importCsv(files); }}
-          onRestore={(history, label) => applyHistory(history, label)}/>
-
+        <div className="breadcrumb">PINE BACKTEST STUDIO <ChevronRight size={13}/> RESEARCH WORKSPACE</div>
+        <div className="headline"><div><div className="eyebrow"><i/> FREE PINE SCRIPT BACKTESTER</div><h1>Strategy dashboard<span>.</span></h1><p>Run your strategies. Study every trade. Find the details that matter.</p></div><div className="db-headline-actions"><a className="btn secondary" href="#data-library"><UploadCloud size={15}/> Import data</a><a className="btn primary" href="#backtest-settings"><Play size={15}/> Backtest setup</a><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset</button></div></div>
+        <OverviewDashboard results={results} demo={demo}/>
+        <div className="db-workspace-heading"><div><span>BACKTEST WORKSPACE</span><h2>Charts &amp; strategy settings</h2></div><a href="#data-library">Need historical data? Open data library <ArrowRight size={15}/></a></div>
         <section className="data-strip">
           <div className="instrument"><div className="au-icon">Au</div><div><strong>{demo ? 'Synthetic demonstration' : 'User-imported market data'} <span>{demo ? 'EXAMPLE' : 'UNVERIFIED'}</span></strong><small>{demo ? 'Generated example candles, not real prices' : 'Confirm source, instrument and contract settings'}</small></div></div>
           <div className="strip-item"><small>DATASET</small><strong title={name}>{name}</strong></div>
@@ -369,25 +377,14 @@ export default function App() {
 
         <div className="workgrid">
           <div className="leftcol">
-            <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ Gold</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button><button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button></div></div>
+            <section className="panel chart-panel" id="chart"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ Selected data</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button><button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button></div></div>
               {chartView === 'backtest' ? <><div className="chart-bar"><strong>{dataSource === 'dukascopy' ? 'DUKASCOPY:XAUUSD' : 'IMPORTED:OHLCV'} · {tf}m</strong><span>{dataSource === 'dukascopy' ? 'REAL HISTORICAL BID' : demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
                   <div className="empty-equity price-chart-empty">No candles in the selected date range. Load more history or choose available dates.</div>}<div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
               : <><div className="chart-bar"><strong>TradingView · TVC:GOLD · {tf}m</strong><span>REFERENCE ONLY</span></div><GoldReferenceChart timeframe={tf}/><div className="reference-note"><Info size={15}/> TradingView provides this display-only chart. The candles are not accessible to PineTS. Backtesting uses the separately imported CSV data, never this widget.</div><div className="panel-foot"><a href="https://www.tradingview.com/symbols/TVC-GOLD/" target="_blank" rel="noreferrer">Open TVC:GOLD on TradingView <ArrowUpRight size={13}/></a><span>Data and strategy results are not synchronized</span></div></>}
             </section>
 
-            <div className="section-heading"><div><small>PERFORMANCE</small><h2>Strategy results</h2></div><span className={'status ' + (results ? 'ready' : '')}>{results ? <Check size={14}/> : <span className="status-ring"/>}{results ? 'BACKTEST COMPLETE' : 'AWAITING BACKTEST'}</span></div>
-            <div className="metrics">
-              <Metric label="Net profit" value={results ? money(results.netProfit) : '—'} caption={results ? num(results.netProfit / (results.initialCapital || 1) * 100) + '% of capital' : 'Run to calculate'} kind={results ? results.netProfit >= 0 ? 'positive' : 'negative' : ''}/>
-              <Metric label="Win rate" value={results ? num(results.winRate, 1) + '%' : '—'} caption={results ? results.trades.length + ' closed trades' : 'Winning / closed trades'}/>
-              <Metric label="Profit factor" value={results ? results.profitFactor === null ? 'N/A' : num(results.profitFactor) : '—'} caption="Gross profit / gross loss"/>
-              <Metric label="Max drawdown" value={results ? money(results.maxDrawdown) : '—'} caption="PineTS reported drawdown"/>
-              <Metric label="Commissions" value={results ? money(results.fees.closedTradeCommissions + results.fees.openTradeEntryCommissions) : '—'}
-                caption={results ? (results.fees.source === 'bybit' ? 'Bybit CFD cost mode' : results.fees.source === 'pine' ? 'Pine Script fees' : num(results.fees.configuredRatePercent ?? 0, 3) + '% per execution') : 'Entry and exit fees'}/>
-            </div>
-
             {results?.fees.bybit && <BybitResultsPanel results={results}/>}
-            <section className="panel equity-panel"><div className="panel-head"><div><small>ACCOUNT PERFORMANCE</small><h2>Realized equity curve</h2></div>{results && <strong className={results.netProfit >= 0 ? 'positive' : 'negative'}>{money(results.initialCapital + results.netProfit)}</strong>}</div><EquityChart results={results}/><div className="panel-foot"><span>Closed-trade P&L only</span><span>{results ? 'Starting capital ' + money(results.initialCapital) : 'Awaiting results'}</span></div></section>
-
+            <div id="analysis" className="db-anchor"><span className="db-kicker">PERFORMANCE INSIGHTS</span></div>
             {results ? <BacktestAnalysis key={results.periodStart + ':' + results.periodEnd + ':' + results.trades.length}
               results={results}
               source={dataSource === 'dukascopy' ? 'Dukascopy XAUUSD BID (not TVC:GOLD)' : dataSource === 'demo' ? 'Synthetic demonstration (not live market data)' : 'User-imported OHLCV (source unverified)'}/>
@@ -397,7 +394,7 @@ export default function App() {
                 </div>}
 
 
-            <section className="panel trades-panel"><div className="panel-head"><div><small>EXECUTION HISTORY</small><h2>Trade log <span className="count">{results?.trades.length || 0}</span></h2></div><button className="text-button" disabled={!results?.trades.length} onClick={() => results && save(exportTrades(results.trades), 'backtest-trades.csv', 'text/csv')}><FileDown size={15}/> Export all CSV</button></div>
+            <section className="panel trades-panel" id="trades"><div className="panel-head"><div><small>EXECUTION HISTORY</small><h2>Trade log <span className="count">{results?.trades.length || 0}</span></h2></div><button className="text-button" disabled={!results?.trades.length} onClick={() => results && save(exportTrades(results.trades), 'backtest-trades.csv', 'text/csv')}><FileDown size={15}/> Export all CSV</button></div>
               <div className="table-scroll"><table><thead><tr><th>SIDE</th><th>ENTRY (UTC)</th><th>EXIT (UTC)</th><th>ENTRY</th><th>EXIT</th><th>SIZE</th><th>NET P&L</th></tr></thead><tbody>
                 {results?.trades.slice(-showCount).reverse().map((t, i) => <tr key={t.id + '-' + i + '-' + t.entryTime}><td><span className={'side ' + t.direction.toLowerCase()}>{t.direction}</span></td><td>{utc(t.entryTime)}</td><td>{utc(t.exitTime)}</td><td>{num(t.entryPrice)}</td><td>{num(t.exitPrice)}</td><td>{num(t.size)}</td><td className={t.profit >= 0 ? 'positive' : 'negative'}>{money(t.profit)}</td></tr>)}
                 {!results?.trades.length && <tr><td colSpan={7}><div className="table-empty"><BarChart3 size={21}/>{results ? 'No closed trades in selected range.' : 'Trade executions will appear here after a backtest.'}</div></td></tr>}
@@ -452,7 +449,7 @@ export default function App() {
             </section>
             <section className="panel code-panel"><div className="tabs"><button className={tab === 'editor' ? 'active' : ''} onClick={() => setTab('editor')}><Code2 size={15}/> Pine editor</button><button className={tab === 'guide' ? 'active' : ''} onClick={() => setTab('guide')}><FolderOpen size={15}/> Data guide</button></div>
               {tab === 'editor' ? <><div className="file-header"><FileCode2 size={15}/><strong>{scriptName}</strong><span>v5 / v6</span></div><textarea spellCheck={false} className="editor" aria-label="Pine Script strategy source" value={code} onChange={e => { setCode(e.target.value); setScriptName('untitled.pine'); setResults(null); }}/><div className="editor-footer"><span>{code.split('\n').length} lines</span><input hidden type="file" accept=".pine,.txt,text/plain" ref={pineRef} onChange={e => { void importPine(e.target.files?.[0]); }}/><button onClick={() => pineRef.current?.click()}><FolderOpen size={14}/> Open .pine</button><button onClick={() => save(code, scriptName, 'text/plain')}><Download size={14}/> Save</button></div><p className="editor-note"><Info size={14}/> Use a <strong>strategy()</strong> script. Some TradingView features are not supported by PineTS.</p></>
-                : <div className="guide"><h3>Start in three steps</h3><p><strong>1. Find and import historical data.</strong> Choose a market from Data Library, obtain an authorized CSV and drag it onto the importer. You can download the synthetic sample to inspect the expected format.</p><p><strong>2. Open a strategy.</strong> Paste a Pine v5/v6 strategy or upload a .pine file. The included Gold Breakout example is configured for gold; for other markets review broker time, stop distance and sizing.</p><p><strong>3. Backtest and review.</strong> Match the instrument's point value, tick size, quantities, costs and historical dates. Run the strategy, review drawdown and export your trades.</p><p>Saved datasets are stored in this browser, not uploaded. Make a CSV backup because browser storage may be cleared.</p><a href={REPO + '/blob/v2-public/PUBLIC_V2.md'} target="_blank" rel="noreferrer">Public V2 usage guide <ArrowUpRight size={14}/></a></div>}
+                : <div className="guide"><h3>Start in three steps</h3><p><strong>1. Find and import historical data.</strong> Choose a market from Data Library, obtain an authorized CSV and drag it onto the importer. You can download the synthetic sample to inspect the expected format.</p><p><strong>2. Open a strategy.</strong> Paste a Pine v5/v6 strategy or upload a .pine file. The included Gold Breakout example is configured for gold; for other markets review broker time, stop distance and sizing.</p><p><strong>3. Backtest and review.</strong> Match the instrument's point value, tick size, quantities, costs and historical dates. Run the strategy, review drawdown and export your trades.</p><p>Saved datasets are stored in this browser, not uploaded. Make a CSV backup because browser storage may be cleared.</p><a href={REPO + '/blob/main/PUBLIC_V2.md'} target="_blank" rel="noreferrer">Public V2 usage guide <ArrowUpRight size={14}/></a></div>}
             </section>
             {error && <div className="error" role="alert"><CircleAlert size={20}/><div><strong>Backtest needs attention</strong><p>{error}</p></div><button onClick={() => setError('')}>×</button></div>}
             {results && results.trades.length === 0 && <section className="zero-diagnostics" role="status"><div className="zero-title"><CircleAlert size={19}/><strong>0 closed trades · diagnostic report</strong></div><p>The engine ran, but did not report closed orders. These checks help distinguish missing price breakouts from unsupported Pine behavior.</p><ul>{results.warnings.slice(0, 6).map((hint, i) => <li key={i}>{hint}</li>)}</ul></section>}
@@ -460,6 +457,15 @@ export default function App() {
             <div className="help-card"><div><Info size={17}/><strong>Research, not execution</strong></div><p>Different gold feeds, tick sizes, spreads and intrabar fills may change results. Validate against a trusted reference before trading.</p><a href={REPO + '#limitations'} target="_blank" rel="noreferrer">Read limitations <ArrowUpRight size={14}/></a></div>
           </div>
         </div>
+        <div className="db-workspace-heading db-library-heading"><div><span>YOUR DATA</span><h2>Market data library</h2></div><span className="db-library-sub">Import, save and reuse price history</span></div>
+        <nav className="v2-steps" aria-label="Three steps to run a backtest">
+          <a href="#data-library"><span className="step-no">01</span><div><strong>Find &amp; import data</strong><small>Bring your OHLCV CSV or restore a saved dataset</small></div><ArrowRight size={16}/></a>
+          <a href="#editor"><span className="step-no">02</span><div><strong>Load a Pine strategy</strong><small>Paste Pine v5/v6 or open a .pine file</small></div><ArrowRight size={16}/></a>
+          <a href="#backtest-settings"><span className="step-no">03</span><div><strong>Run &amp; analyze</strong><small>Select dates, instrument settings and trading costs</small></div><ArrowRight size={16}/></a>
+        </nav>
+        <DataLibrary bars={bars} name={name} demo={demo}
+          onImport={files => { csvModeRef.current = 'replace'; void importCsv(files); }}
+          onRestore={(history, label) => applyHistory(history, label)}/>
         <footer>© 2026 Pine Backtest Studio · V2 Public Beta <span>Powered by PineTS & Lightweight Charts · Not affiliated with TradingView</span></footer>
       </main>
     </div>
