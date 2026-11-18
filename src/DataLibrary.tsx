@@ -10,8 +10,12 @@ interface Props {
   bars: Candle[];
   name: string;
   demo: boolean;
-  onImport: (files: FileList | null) => void;
+  onImport: (files: FileList | null, append: boolean) => void;
   onRestore: (bars: Candle[], name: string) => void;
+  onLoadPrivateGold: () => void;
+  loadingGold: boolean;
+  progress: string;
+  goldError?: string;
 }
 
 const date = (ms: number) => new Date(ms).toISOString().slice(0, 10);
@@ -25,10 +29,11 @@ function downloadCsv(candles: Candle[], label: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function DataLibrary({ bars, name, demo, onImport, onRestore }: Props) {
+export default function DataLibrary({ bars, name, demo, onImport, onRestore, onLoadPrivateGold, loadingGold, progress, goldError }: Props) {
   const csvInput = useRef<HTMLInputElement>(null);
   const [chosen, setChosen] = useState('XAUUSD');
   const [dragging, setDragging] = useState(false);
+  const [append, setAppend] = useState(false);
   const [saved, setSaved] = useState<SavedDatasetSummary[]>([]);
   const [status, setStatus] = useState('');
   const [favorites, setFavorites] = useState<string[]>(() => {
@@ -75,7 +80,7 @@ export default function DataLibrary({ bars, name, demo, onImport, onRestore }: P
     catch (e) { setStatus(e instanceof Error ? e.message : 'Unable to delete data.'); }
   }
   const upload = (files: FileList | null) => {
-    if (files?.length) onImport(files);
+    if (files?.length) onImport(files, append && !demo);
     if (csvInput.current) csvInput.current.value = '';
   };
   return <section className="v2-library" id="data-library" aria-label="Market data library">
@@ -89,6 +94,23 @@ export default function DataLibrary({ bars, name, demo, onImport, onRestore }: P
         <Download size={16}/> Download current CSV
       </button>
     </header>
+    <section className="v2-gold-quickstart" aria-label="10-year Gold 15-minute history">
+      <div className="v2-gold-quickstart-copy">
+        <span className="v2-gold-quickstart-tag">GOLD HISTORY · 15-MINUTE CANDLES</span>
+        <h3>Ready to test a decade of Gold?</h3>
+        <p>Load your private history if it is configured, or download Gold 15-minute files from a data provider and import them here. Select 2016 through 2026 for a rolling ten-year window, then use the <strong>10Y</strong> range button in the backtest settings.</p>
+        <div className="v2-gold-quickstart-actions">
+          <button className="v2-gold-primary" type="button" disabled={loadingGold} onClick={onLoadPrivateGold}>
+            <Database size={16}/> {loadingGold ? 'Loading private Gold history…' : 'Load my 10-year Gold history'}
+          </button>
+          <a href="https://evtradelabs.com/data" target="_blank" rel="noopener noreferrer">Get XAUUSD M15 yearly data <ArrowUpRight size={15}/></a>
+          <button className="v2-gold-upload" type="button" onClick={() => csvInput.current?.click()}><UploadCloud size={16}/> Import Gold files / ZIP</button>
+        </div>
+        {progress && <small role="status" className="v2-gold-quickstart-progress">{progress}</small>}
+        {goldError && <p role="alert" className="v2-gold-quickstart-error">{goldError}</p>}
+        <small className="v2-gold-quickstart-note">The public site does not include third-party gold candles. The private loader works only if an authorized /history/manifest.json dataset is configured. At the provider, filter <strong>XAUUSD / M15</strong>; the current year may require a free account. Data remains in your browser when imported.</small>
+      </div>
+    </section>
     <div className="v2-cards">
       {markets.map(market => <article className={'v2-market ' + (chosen === market.symbol ? 'chosen' : '')} key={market.symbol}>
         <div className="v2-market-header">
@@ -109,11 +131,12 @@ export default function DataLibrary({ bars, name, demo, onImport, onRestore }: P
         onDragLeave={e => { e.preventDefault(); setDragging(false); }}
         onDrop={e => { e.preventDefault(); setDragging(false); upload(e.dataTransfer.files); }}>
         <UploadCloud size={28}/>
-        <strong>Drag and drop your historical CSV files</strong>
-        <p>Upload multiple files from the same market and timeframe. The data is processed in your browser, not sent to our server.</p>
-        <input ref={csvInput} type="file" multiple accept=".csv,text/csv" hidden onChange={e => upload(e.target.files)} aria-label="Import historical price CSV"/>
-        <button className="v2-accent-btn" onClick={() => csvInput.current?.click()}><UploadCloud size={15}/> Choose CSV files</button>
-        <small>CSV columns: timestamp, open, high, low, close; volume is optional. UTC preferred.</small>
+        <strong>Drop your historical Gold CSV, JSON.gz or ZIP here</strong>
+        <p>Import up to 25 yearly files, or one ZIP archive containing them. Files must use the same market, timeframe and price feed. Processing stays in your browser.</p>
+        <input ref={csvInput} type="file" multiple accept=".csv,.txt,.json,.gz,.zip,text/csv,application/zip" hidden onChange={e => upload(e.target.files)} aria-label="Import historical price data archive"/>
+        <button className="v2-accent-btn" onClick={() => csvInput.current?.click()}><UploadCloud size={15}/> Choose history files</button>
+        {!demo && <label className="v2-gold-append"><input type="checkbox" checked={append} onChange={e => setAppend(e.target.checked)}/> Add older/newer years to the currently loaded dataset</label>}
+        <small>CSV: timestamp, open, high, low, close (volume optional). Also accepts the provider JSON.gz format and ZIP archives. Import only data you are permitted to use.</small>
       </div>
       <div className="v2-saved">
         <div className="v2-saved-title"><Database size={19}/><strong>My saved datasets</strong><small>Private to this browser</small></div>
@@ -130,6 +153,6 @@ export default function DataLibrary({ bars, name, demo, onImport, onRestore }: P
         {status && <p role="status" className="v2-status">{status}</p>}
       </div>
     </div>
-    <p className="v2-disclaimer"><Info size={15}/> Market shortcuts open external provider pages. No third-party historical market data is bundled, redistributed, or automatically fetched. All imported symbols and prices remain unverified.</p>
+    <p className="v2-disclaimer"><Info size={15}/> Market shortcuts link to external providers. The public site does not package or redistribute market data. Gold XAUUSD and TVC:GOLD use different price feeds, so results are not directly interchangeable.</p>
   </section>;
 }
