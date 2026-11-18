@@ -123,6 +123,7 @@ export default function App() {
   const [tf, setTf] = useState(15);
   const [chartView, setChartView] = useState<'backtest' | 'reference'>('backtest');
   const [fetchingHistory, setFetchingHistory] = useState(false);
+  const [privateGoldAvailable, setPrivateGoldAvailable] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [loadingProgress, setLoadingProgress] = useState('');
   const [dataSource, setDataSource] = useState<'demo' | 'csv' | 'dukascopy'>('demo');
@@ -150,10 +151,13 @@ export default function App() {
 
   useEffect(() => () => workerRef.current?.terminate(), []);
   useEffect(() => {
-    // Cloudflare builds generate /history/manifest.json. When missing (e.g.
-    // local dev) the app stays in its clearly marked synthetic demo state.
-    // Public V2 deliberately does not auto-fetch or republish third-party candles.
-    // Visitors start with clearly marked synthetic demo or import their own CSV.
+    // Detect a separately configured, authorized personal dataset.
+    // Never download third-party data automatically on the public site.
+    const controller = new AbortController();
+    void fetch('/history/manifest.json', { method: 'HEAD', signal: controller.signal })
+      .then(response => { if (!controller.signal.aborted) setPrivateGoldAvailable(response.ok); })
+      .catch(() => {});
+    return () => controller.abort();
   }, []);
   const feePreview = useMemo(() => {
     try { return { plan: planExecutionCosts(code, fees, contract.pointvalue, contract.mintick), error: '' }; }
@@ -362,7 +366,7 @@ export default function App() {
           <div className="strip-item"><small>AVAILABLE BARS</small><strong>{bars.length.toLocaleString()}</strong></div>
           <div className="strip-item"><small>DATA INTERVAL</small><strong>{interval || '—'}m</strong></div>
           <div className="strip-item coverage-metric"><small>HISTORY AVAILABLE (UTC)</small><strong>{coverage?.first} → {coverage?.last}</strong><small>{coverage?.years.toFixed(2)} calendar years</small></div>
-          <input hidden type="file" multiple accept=".csv,text/csv" ref={csvRef} onChange={e => { void importCsv(e.target.files); }}/>
+          <input hidden type="file" multiple accept=".csv,.txt,.json,.gz,.zip,text/csv,application/zip" ref={csvRef} onChange={e => { void importCsv(e.target.files); }}/>
           <button className="btn secondary" onClick={() => { csvModeRef.current = 'replace'; csvRef.current?.click(); }}><UploadCloud size={16}/> Import CSV files</button>
           {!demo && <button className="btn secondary" onClick={() => { csvModeRef.current = 'append'; csvRef.current?.click(); }}>Add more data</button>}
           {loadingProgress && <span className="history-import-status" role="status">{loadingProgress}</span>}
@@ -476,6 +480,8 @@ export default function App() {
           onImport={(files, append) => { csvModeRef.current = append ? 'append' : 'replace'; void importCsv(files, csvModeRef.current); }}
           onLoadPrivateGold={() => { void loadCloudflareHistory(); }}
           loadingGold={fetchingHistory} progress={loadingProgress}
+          goldAvailable={privateGoldAvailable}
+          goldError={error.startsWith('Unable to load ten-year XAUUSD data:') ? error : undefined}
           onRestore={(history, label) => applyHistory(history, label)}/>
         <footer>© 2026 Pine Backtest Studio · V2 Public Beta <span>Powered by PineTS & Lightweight Charts · Not affiliated with TradingView</span></footer>
       </main>
