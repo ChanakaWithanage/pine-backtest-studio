@@ -2,9 +2,9 @@
 
 V2 is the public-facing browser backtester. The **previous V1** is preserved on the [`v1-stable` branch](https://github.com/ChanakaWithanage/pine-backtest-studio/tree/v1-stable). The `v2-public` branch retains the release development history; `main` is the deployment branch.
 
-**Get started:** (1) use Data Library to import a permitted OHLCV CSV, (2) open or edit a Pine strategy, (3) set dates, instrument sizing and execution costs, and run the backtest. You can pin market-data provider shortcuts, save imported datasets in the browser, and export CSV backups.
+**Get started:** The public V2 automatically loads **200,000 actual XAUUSD 15-minute candles (2017-12-07 to 2026-05-28 UTC)** from a credited CC BY 4.0 dataset. No CSV import is necessary for Gold. Open or edit a Pine strategy, choose dates, instrument sizing and execution costs, and run. You may also import alternative market data or save your own datasets.
 
-**Public data policy:** V2 does not automatically fetch or serve Dukascopy or TradingView candle history. The built-in dataset is synthetic demonstration data. Market-data downloads must be obtained independently under appropriate usage rights.
+**Public data policy:** The built-in real candles are attributed to [Yllvar/fx-historical-data](https://huggingface.co/datasets/Yllvar/fx-historical-data), under its stated [CC BY 4.0 license](https://creativecommons.org/licenses/by/4.0/). A build script checks the source's SHA-256 and converts the Parquet snapshot into yearly CSV files. It is a distinct XAUUSD feed, not TVC:GOLD or Bybit. The source covers **about 8.5 years**, not a complete November 2016–November 2026 period. The original synthetic demonstration remains available via Reset. See [the current V2 guide](PUBLIC_V2.md).
 
 **Deploy:** Cloudflare Pages, production branch `main`, build command `npm run build`, output `dist`, Node.js 22. See [Public V2 guide](PUBLIC_V2.md).
 
