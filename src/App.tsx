@@ -179,7 +179,7 @@ export default function App() {
     try { return resampleCandles(bars.filter(b => b.time >= from && b.time < to), tf); } catch { return []; }
   }, [bars, start, end, tf]);
   const stop = () => { workerRef.current?.terminate(); workerRef.current = null; setRunning(false); };
-  const reset = () => { historyRequestSeq.current++; stop(); setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } }); setDataSource('demo'); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
+  const reset = () => { historyRequestSeq.current++; stop(); setFetchingHistory(false); setLoadingProgress(''); setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } }); setDataSource('demo'); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
   function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' | 'licensed' = 'csv') {
     stop();
     setBars(next);
