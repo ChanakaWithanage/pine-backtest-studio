@@ -80,10 +80,12 @@ export function parseHistoryArchive(bytes: Uint8Array, name: string): Candle[][]
   const archive = unzipSync(bytes, {
     filter: entry => {
       if (entry.originalSize > MAX_UNCOMPRESSED) throw new Error(entry.name + ': too large.');
-      return /\.(csv|txt|json|json\.gz)$/i.test(entry.name) && !entry.name.startsWith('__MACOSX/');
+      return /\.(csv|json|json\.gz)$/i.test(entry.name) &&
+        !/(^|\/)(manifest|metadata|package)\.json$/i.test(entry.name) &&
+        !entry.name.startsWith('__MACOSX/');
     }
   });
-  const parts = Object.entries(archive).filter(([path]) => /\.(csv|txt|json|json\.gz)$/i.test(path));
+  const parts = Object.entries(archive).filter(([path]) => /\.(csv|json|json\.gz)$/i.test(path));
   if (!parts.length) throw new Error(name + ': no supported CSV/JSON files in ZIP.');
   if (parts.length > MAX_ARCHIVE_PARTS) throw new Error('ZIP includes more than 25 historical files.');
   const totalBytes = parts.reduce((total, [, body]) => total + body.byteLength, 0);
