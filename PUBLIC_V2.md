@@ -1,49 +1,57 @@
 # Pine Backtest Studio V2 — public beta
 
-**V1 is preserved on `v1-stable`. V2's deployment branch is `main`; development history also remains on `v2-public`.**
+**V1 remains archived on `v1-stable`. V2 is deployed from `main`.**
 
-## User journey
-1. **Choose data:** pick a favorite market shortcut, obtain an OHLCV CSV from an authorized source, drag it onto the page or use the import button. Built-in synthetic example data is also available for UI exploration.
-2. **Choose strategy:** import a Pine v5/v6 strategy or edit the supplied Gold Breakout example. Other markets require instrument-specific session, point-value and order-sizing settings.
-3. **Run and review:** choose the date range and costs; run in the browser, inspect trades and drawdown, and export trades to CSV.
+## Built-in Gold history (no manual import)
 
+The V2 site **automatically loads real XAUUSD 15-minute historical candles** from its static distribution when opened.
 
-## Backtest 10 years of Gold (15m)
-The 10Y date preset selects a range in the candles already loaded. It **does not download missing history**.
+- **Data source:** [Yllvar/fx-historical-data on Hugging Face](https://huggingface.co/datasets/Yllvar/fx-historical-data), advertised under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- **Verified snapshot:** **200,000 candles** from **2017-12-07 through 2026-05-28 UTC** (approximately 8.5 years). These are the actual verified source timestamps. **It is not an uninterrupted November 2016–November 2026 dataset.**
+- **Attribution:** Original market data is published by Yllvar. The app's build converts the downloaded Parquet file to yearly UTC CSV files and selects the source's latest available 10-year range without inventing missing prices. The dataset publisher describes the underlying feed as Dukascopy-derived. This is not TradingView TVC:GOLD, Bybit TradFi or Binance PAXGUSDT.
+- **Automatic workflow:** `scripts/prepare-licensed-gold.mjs` downloads the publisher's pinned source file during `npm run build`, validates its SHA-256, timestamps, OHLCV and candle counts, and packages `dist/open-gold/manifest.json` plus ten yearly CSV segments. The website fetches the manifest and imports them on startup. GitHub CI verifies these generated files.
+- **When source data changes:** Update the pinned SHA-256 after reviewing the new dataset. Never replace real source candles with synthetic data to increase the reported coverage.
 
-1. In **Data library → Gold history**, open the [EV Trading Labs data catalogue](https://evtradelabs.com/data) and filter **XAUUSD / M15**. Download your permitted yearly files for 2016–2025, plus the 2026 file if you need the latest partial year. Some files, including the current year, may require a free account. Confirm the licence and attribute the source where required.
-2. Use **Import Gold files / ZIP** (or the drag-and-drop area). Select the .json.gz, .json, CSV files or a ZIP archive. The browser validates each candle and merges overlapping dates only if the OHLCV values agree. Keep all years from the **same source and bid/ask type**.
-3. Confirm the displayed **first and last dates**, total bars and 15-minute interval. The ten-year span should be around November 2016–November 2026, depending on the actual last available candle. Select **10Y** or **All loaded**, verify contract value/commission settings, and run.
-4. Use **Save current dataset** to retain the imported candles in browser storage for future visits. Also download a CSV backup since browser storage can be evicted.
+Selecting **10Y** uses the greatest available portion of the loaded real candles. If the requested date would begin before the source's first candle, the UI clamps the start date and explains the limit. The **All loaded** button always selects the entire true source period.
 
-An optional private loader is available for deployments with an authorized `/history/manifest.json` and yearly history files. It is disabled when no manifest exists. The public Cloudflare build does not bundle or automatically download Dukascopy candles; Dukascopy's website usage terms restrict redistribution and unapproved automated collection.
+Market-data redistribution and derivative rights can involve the original upstream provider as well as the published dataset's CC BY license. Review source terms when changing datasets.
+
+## How to run a backtest
+
+1. Open the website. The app loads the bundled historical Gold data automatically and reports the **actual available date range**. No CSV import, registration or download is needed.
+2. Paste or load a Pine v5/v6 strategy. The default Gold Breakout example can be tested immediately. Verify the strategy's time zone, sizing and fees.
+3. Select the date range, instrument contract assumptions and fees, then run. Inspect the detailed metrics and export the trade log.
+
+For **other symbols or a different Gold feed**, use the Data Library to drag and drop CSV/JSON.gz/ZIP files from a source you are permitted to process, or restore a dataset saved in your own browser. The app does not mix provider feeds silently.
 
 ## Data Library
-- A curated set of market shortcuts (XAUUSD, XAGUSD, GBPUSD, EURUSD and NAS100), each with provider access instructions.
-- Favorite shortcuts are kept in this browser's localStorage.
-- User-imported candles can be saved privately to IndexedDB for future sessions, reloaded or removed.
-- Current candles can be exported to an ordinary CSV for backup and reimport.
-- A synthetic demo dataset is always available; it is **not real market data**.
-- No external data provider feed is scraped, proxied, predownloaded or hosted by this public release.
-- User-selected ZIP, JSON.gz, JSON, and CSV histories can be merged without uploading files to a backend.
 
-### Publishing safely
-V2 `npm run build` **does not download Dukascopy market data**. It refuses to package market files under `public/history/` unless `V2_PUBLIC_DATA_LICENSE_CONFIRMED=yes` is explicitly supplied and the operator has independently verified the necessary rights.
+- Curated market shortcuts for XAUUSD, XAGUSD, GBPUSD, EURUSD and NAS100.
+- Favorite market shortcuts stored locally.
+- User-imported datasets saved privately in IndexedDB and restored on the same browser.
+- CSV exports for local backup.
+- A synthetic demo is available via **Reset**, clearly labeled. Synthetic demo results are not actual historical returns.
 
-Public historical data is not included because display/download availability does not imply public redistribution and commercial-use permission. TradingView chart embed is reference-only, not a source of backtesting candles.
+## Publishing and data policies
+
+The optional legacy private Dukascopy history loader remains guarded under `/history/`; it is disabled if the private manifest is absent and the public build does not download Dukascopy directly. The new independently published Yllvar dataset is packaged separately under `/open-gold/`, with publisher, license and modification attribution.
+
+The backtest itself is computed locally in the browser. The supplied market prices are published static assets, so visitors can retrieve them. Any site relying on third-party data must confirm the necessary upstream distribution permissions.
 
 ## Cloudflare Pages deployment
-Use your existing **Cloudflare Pages Git deployment** (if linked to this repository) with:
+
 - Repository: `ChanakaWithanage/pine-backtest-studio`
 - Production branch: `main`
 - Build command: `npm run build`
-- Output directory: `dist`
-- Node.js: `22`
+- Output: `dist`
+- Node.js: 22
 
-The previous V1 is still available on the `v1-stable` branch. Publishing V2 on `main` replaces the existing site's V1 build if Cloudflare Pages deploys `main`. For a separate V1 website, configure another Pages project pointing to `v1-stable`. If you later obtain licensed public datasets, implement a vetted hosted dataset catalog separately.
+The legacy V1 code remains in `v1-stable`. Run `npm run test` and `npm run build` before release. A successful build verifies the historical data download; GitHub CI also checks the manifest and generated file sizes.
 
 ## Important limitations
-- PineTS is not TradingView's broker emulator. Verify representative executions against TradingView.
-- Browser storage can be cleared or evicted; use Download CSV for backups.
-- All CSV sources remain unverified; do not confuse Dukascopy XAUUSD, TVC:GOLD and broker-specific gold CFDs.
-- Cost and contract assumptions are per instrument. Historical performance does not predict future results.
+
+- PineTS is an independent runtime; strategy execution and fills can differ from TradingView.
+- The bundled XAUUSD source has **only 8.5 years** of candles ending in May 2026. Do not advertise ten years ending in November 2026 until those bars actually exist.
+- Candle times are UTC. No missing bars are synthesized.
+- Actual instrument contract, margin, fees and bid/ask characteristics must be configured correctly.
+- Historical backtest results are not guarantees of live-trading performance.
