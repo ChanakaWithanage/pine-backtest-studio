@@ -13,3 +13,20 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run test
       - run: npm run build
+      - name: Verify real licensed Gold candles were included in the site build
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, statSync } from 'node:fs';
+          const m = JSON.parse(readFileSync('dist/open-gold/manifest.json', 'utf8'));
+          if (m.instrument !== 'XAUUSD' || m.timeframeMinutes !== 15 ||
+              m.provider !== 'Yllvar/fx-historical-data' ||
+              m.license !== 'CC-BY-4.0' || m.count < 190000 ||
+              m.files.length < 10 || m.first >= m.last)
+            throw new Error('The built site lacks correctly attributed historical Gold data');
+          for (const file of m.files) {
+            const path = 'dist' + file.file;
+            if (statSync(path).size !== file.bytes)
+              throw new Error('Historical Gold file missing or truncated: '+path);
+          }
+          console.log('Ready-to-load licensed Gold candles:',m.count,new Date(m.first).toISOString(),new Date(m.last).toISOString());
+          NODE
