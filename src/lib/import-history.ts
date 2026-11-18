@@ -5,8 +5,8 @@
  */
 import { decompressSync, strFromU8, unzipSync } from 'fflate';
 import type { Candle } from '../types';
-import { parseCsv, parseTimestamp } from './csv';
-import { MAX_TOTAL_CANDLES, mergeCandleBatches } from './history';
+import { parseCsv, parseTimestamp } from './csv.ts';
+import { MAX_TOTAL_CANDLES, mergeCandleBatches } from './history.ts';
 
 const MAX_SINGLE_BYTES = 90 * 1024 * 1024;
 const MAX_UNCOMPRESSED = 120 * 1024 * 1024;
