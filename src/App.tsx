@@ -10,6 +10,7 @@ import { DEFAULT_CONTRACT } from './lib/csv-provider';
 import { DEFAULT_FEES, DEFAULT_BYBIT, planExecutionCosts, type FeeSettings, type BybitSettings } from './lib/commissions';
 import { BybitSettingsPanel, BybitResultsPanel } from './BybitComponents';
 import { readHostedHistoryManifest } from './lib/hosted';
+import { readLicensedGoldManifest } from './lib/licensed-gold';
 import { checkRequestedCoverage, getHistoryCoverage, mergeCandleBatches, pastYearsFromLastCandle } from './lib/history';
 import { exportTrades, inferIntervalMinutes, parseCsv, resampleCandles } from './lib/csv';
 import { importHistoryFiles } from './lib/import-history';
@@ -126,7 +127,7 @@ export default function App() {
   const [privateGoldAvailable, setPrivateGoldAvailable] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [loadingProgress, setLoadingProgress] = useState('');
-  const [dataSource, setDataSource] = useState<'demo' | 'csv' | 'dukascopy'>('demo');
+  const [dataSource, setDataSource] = useState<'demo' | 'csv' | 'dukascopy' | 'licensed'>('demo');
   const autoLoadStarted = useRef(false);
   const historyRequestSeq = useRef(0);
   const csvModeRef = useRef<'replace' | 'append'>('replace');
@@ -151,6 +152,11 @@ export default function App() {
 
   useEffect(() => () => workerRef.current?.terminate(), []);
   useEffect(() => {
+    if (autoLoadStarted.current) return;
+    autoLoadStarted.current = true;
+    void loadBundledGold(true);
+  }, []);
+  useEffect(() => {
     // Detect a separately configured, authorized personal dataset.
     // Never download third-party data automatically on the public site.
     const controller = new AbortController();
@@ -174,7 +180,7 @@ export default function App() {
   }, [bars, start, end, tf]);
   const stop = () => { workerRef.current?.terminate(); workerRef.current = null; setRunning(false); };
   const reset = () => { historyRequestSeq.current++; stop(); setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } }); setDataSource('demo'); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
-  function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' = 'csv') {
+  function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' | 'licensed' = 'csv') {
     stop();
     setBars(next);
     setDemo(false);
@@ -219,6 +225,67 @@ export default function App() {
       setError(e instanceof Error ? e.message : 'Failed to load historical price data.');
     } finally { setLoadingProgress(''); }
     if (csvRef.current) csvRef.current.value = '';
+  }
+
+  /**
+   * Load the attributed CC BY data packaged by our build from the published
+   * Hugging Face dataset. No manual file download or account required.
+   * This feed is NOT TVC:GOLD and may end before the present calendar date.
+   */
+  async function loadBundledGold(auto = false) {
+    const seq = ++historyRequestSeq.current;
+    setFetchingHistory(true);
+    setError('');
+    setLoadingProgress('Loading included historical XAUUSD 15m data…');
+    try {
+      const response = await fetch('/open-gold/manifest.json', { cache: 'no-cache' });
+      const manifest = await readLicensedGoldManifest(response);
+      if (!manifest) {
+        if (!auto) throw new Error('Included Gold history is missing from the deployment. Check that its production build generated /open-gold/manifest.json.');
+        return;
+      }
+      const groups = new Array<Candle[]>(manifest.files.length);
+      let cursor = 0;
+      await Promise.all(Array.from({length: Math.min(3, manifest.files.length)}, async () => {
+        while (cursor < manifest.files.length) {
+          const i = cursor++;
+          if (seq !== historyRequestSeq.current) return;
+          const part = manifest.files[i];
+          setLoadingProgress('Loading real Gold history, year ' + (i + 1) + ' of ' + manifest.files.length + '…');
+          const r = await fetch(part.file, { cache: 'force-cache' });
+          if (!r.ok) throw new Error('Missing Gold history segment: ' + part.file + ' (HTTP ' + r.status + ').');
+          const text = await r.text();
+          if (text.length > 24 * 1024 * 1024 || text.trimStart().startsWith('<')) {
+            throw new Error('Gold history CSV is missing, oversized, or Cloudflare returned HTML: ' + part.file);
+          }
+          const candles = parseCsv(text);
+          if (candles.length !== part.count ||
+              candles[0].time !== part.first ||
+              candles[candles.length - 1].time !== part.last) {
+            throw new Error('Gold history did not pass source validation: ' + part.file);
+          }
+          groups[i] = candles;
+        }
+      }));
+      if (seq !== historyRequestSeq.current) return;
+      const combined = mergeCandleBatches(groups);
+      if (combined.length !== manifest.count ||
+          combined[0].time !== manifest.first ||
+          combined[combined.length - 1].time !== manifest.last) {
+        throw new Error('Included Gold history is incomplete or mismatched.');
+      }
+      applyHistory(combined, 'XAUUSD 15m · Yllvar / Hugging Face (CC BY 4.0)', 'licensed');
+      setImportMessage('Loaded ' + combined.length.toLocaleString() + ' REAL Gold candles, ' + day(combined[0].time) + ' through ' + day(combined[combined.length - 1].time) + ' UTC. Provider: Yllvar (CC BY 4.0). Historical coverage is determined by the source file, not the current date.');
+    } catch (e) {
+      if (seq === historyRequestSeq.current) {
+        setError('Included Gold dataset could not be loaded: ' + (e instanceof Error ? e.message : String(e)));
+      }
+    } finally {
+      if (seq === historyRequestSeq.current) {
+        setFetchingHistory(false);
+        setLoadingProgress('');
+      }
+    }
   }
 
   /**
@@ -362,10 +429,11 @@ export default function App() {
       <main className="main">
         <div className="breadcrumb">PINE BACKTEST STUDIO <ChevronRight size={13}/> RESEARCH WORKSPACE</div>
         <div className="headline"><div><div className="eyebrow"><i/> FREE PINE SCRIPT BACKTESTER</div><h1>Strategy dashboard<span>.</span></h1><p>Run your strategies. Study every trade. Find the details that matter.</p></div><div className="db-headline-actions"><a className="btn secondary" href="#data-library"><UploadCloud size={15}/> Import data</a><a className="btn primary" href="#backtest-settings"><Play size={15}/> Backtest setup</a><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset</button></div></div>
+        {fetchingHistory && <div className="history-import-status" role="status">Loading included Gold dataset: {loadingProgress || 'Preparing candles…'}</div>}
         <OverviewDashboard results={results} demo={demo}/>
         <div className="db-workspace-heading"><div><span>BACKTEST WORKSPACE</span><h2>Charts &amp; strategy settings</h2></div><a href="#data-library">Need historical data? Open data library <ArrowRight size={15}/></a></div>
         <section className="data-strip">
-          <div className="instrument"><div className="au-icon">Au</div><div><strong>{demo ? 'Synthetic demonstration' : 'User-imported market data'} <span>{demo ? 'EXAMPLE' : 'UNVERIFIED'}</span></strong><small>{demo ? 'Generated example candles, not real prices' : 'Confirm source, instrument and contract settings'}</small></div></div>
+          <div className="instrument"><div className="au-icon">Au</div><div><strong>{demo ? 'Synthetic demonstration' : dataSource === 'licensed' ? 'XAUUSD · Yllvar dataset' : 'User-imported market data'} <span>{demo ? 'EXAMPLE' : dataSource === 'licensed' ? 'CC BY 4.0' : 'UNVERIFIED'}</span></strong><small>{demo ? 'Generated example candles, not real prices' : dataSource === 'licensed' ? 'Real historical source, provider-defined feed; not TVC:GOLD' : 'Confirm source, instrument and contract settings'}</small></div></div>
           <div className="strip-item"><small>DATASET</small><strong title={name}>{name}</strong></div>
           <div className="strip-item"><small>AVAILABLE BARS</small><strong>{bars.length.toLocaleString()}</strong></div>
           <div className="strip-item"><small>DATA INTERVAL</small><strong>{interval || '—'}m</strong></div>
@@ -395,7 +463,7 @@ export default function App() {
         <div className="workgrid">
           <div className="leftcol">
             <section className="panel chart-panel" id="chart"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ Selected data</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button><button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button></div></div>
-              {chartView === 'backtest' ? <><div className="chart-bar"><strong>{dataSource === 'dukascopy' ? 'DUKASCOPY:XAUUSD' : 'IMPORTED:OHLCV'} · {tf}m</strong><span>{dataSource === 'dukascopy' ? 'REAL HISTORICAL BID' : demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
+              {chartView === 'backtest' ? <><div className="chart-bar"><strong>{dataSource === 'dukascopy' ? 'DUKASCOPY:XAUUSD' : dataSource === 'licensed' ? 'YLLVAR:XAUUSD' : 'IMPORTED:OHLCV'} · {tf}m</strong><span>{dataSource === 'dukascopy' ? 'REAL HISTORICAL BID' : dataSource === 'licensed' ? 'REAL SOURCE · CC BY 4.0' : demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
                   <div className="empty-equity price-chart-empty">No candles in the selected date range. Load more history or choose available dates.</div>}<div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
               : <><div className="chart-bar"><strong>TradingView · TVC:GOLD · {tf}m</strong><span>REFERENCE ONLY</span></div><GoldReferenceChart timeframe={tf}/><div className="reference-note"><Info size={15}/> TradingView provides this display-only chart. The candles are not accessible to PineTS. Backtesting uses the separately imported CSV data, never this widget.</div><div className="panel-foot"><a href="https://www.tradingview.com/symbols/TVC-GOLD/" target="_blank" rel="noreferrer">Open TVC:GOLD on TradingView <ArrowUpRight size={13}/></a><span>Data and strategy results are not synchronized</span></div></>}
             </section>
@@ -483,6 +551,7 @@ export default function App() {
         <DataLibrary bars={bars} name={name} demo={demo}
           onImport={(files, append) => { csvModeRef.current = append ? 'append' : 'replace'; void importCsv(files, csvModeRef.current); }}
           onLoadPrivateGold={() => { void loadCloudflareHistory(); }}
+          onLoadBundledGold={() => { void loadBundledGold(); }}
           loadingGold={fetchingHistory} progress={loadingProgress}
           goldAvailable={privateGoldAvailable}
           goldError={error.startsWith('Unable to load ten-year XAUUSD data:') ? error : undefined}
