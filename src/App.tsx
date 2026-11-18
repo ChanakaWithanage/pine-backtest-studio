@@ -371,8 +371,14 @@ export default function App() {
     const range = years === 'all'
       ? { start: day(bars[0].time), end: day(bars[bars.length - 1].time) }
       : pastYearsFromLastCandle(bars, years);
+    // A "10Y" shortcut can only select actual loaded history. Never request
+    // fabricated pre-history when the licensed feed covers fewer than 10 years.
+    const selectedStart = range.start < day(bars[0].time) ? day(bars[0].time) : range.start;
     stop();
-    setStart(range.start); setEnd(range.end); setResults(null); setError('');
+    setStart(selectedStart); setEnd(range.end); setResults(null); setError('');
+    if (years !== 'all' && selectedStart !== range.start) {
+      setImportMessage('The selected ' + years + 'Y range exceeds the source history. Using all available real candles starting ' + selectedStart + ' instead.');
+    }
   }
 
   async function importPine(file?: File) {
