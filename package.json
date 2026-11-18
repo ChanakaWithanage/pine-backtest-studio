@@ -6,7 +6,7 @@
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/public-build-guard.mjs",
+    "prebuild": "node scripts/public-build-guard.mjs && node scripts/prepare-licensed-gold.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
@@ -27,6 +27,8 @@
     "@vitejs/plugin-react": "^5.1.2",
     "dukascopy-node": "1.51.1",
     "typescript": "~5.9.3",
-    "vite": "^7.3.7"
+    "vite": "^7.3.7",
+    "hyparquet": "^1.31.5",
+    "hyparquet-compressors": "^1.1.2"
   }
 }
