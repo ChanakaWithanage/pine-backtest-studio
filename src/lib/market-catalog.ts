@@ -17,9 +17,9 @@ export const MARKET_SHORTCUTS: MarketShortcut[] = [
     symbol: 'XAUUSD', name: 'Gold / USD', category: 'Metals',
     description: 'Your original overnight-range breakout market.',
     suggestedTimeframe: '15m',
-    provider: 'Dukascopy historical data export',
-    providerUrl: 'https://www.dukascopy.com/swiss/english/marketwatch/historical/',
-    note: 'Choose XAUUSD and 15-minute BID data at the provider. Not the same as TVC:GOLD.'
+    provider: 'EV Trading Labs historical data catalogue',
+    providerUrl: 'https://evtradelabs.com/data',
+    note: 'Filter XAUUSD / M15, select years 2016–2026 and export permitted yearly files. Recent-year data may require a free account. Import a ZIP or JSON.gz. Not TVC:GOLD.'
   },
   {
     symbol: 'XAGUSD', name: 'Silver / USD', category: 'Metals',
