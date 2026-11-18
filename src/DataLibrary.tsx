@@ -105,6 +105,9 @@ export default function DataLibrary({ bars, name, demo, onImport, onRestore, onL
           <button className="v2-gold-primary" type="button" disabled={loadingGold} onClick={onLoadBundledGold}>
             <Database size={16}/> {loadingGold ? 'Loading Gold candles…' : 'Reload included Gold history'}
           </button>
+          <button className="v2-gold-upload" type="button" disabled={demo || loadingGold} onClick={() => downloadCsv(bars, 'XAUUSD-15m-' + date(bars[0].time) + '-to-' + date(bars[bars.length - 1].time))}>
+            <Download size={16}/> Download Gold CSV ({demo ? 'loading…' : date(bars[0].time) + ' to ' + date(bars[bars.length - 1].time)})
+          </button>
           <button className="v2-gold-upload" type="button" onClick={() => csvInput.current?.click()}>
             <UploadCloud size={16}/> Import a different data feed
           </button>
