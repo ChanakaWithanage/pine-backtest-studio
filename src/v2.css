@@ -60,3 +60,22 @@ html{scroll-behavior:smooth}
 @media(max-width:1400px){.v2-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:1000px){.v2-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.v2-data-actions,.v2-steps{grid-template-columns:1fr}}
 @media(max-width:620px){.v2-library{padding:13px}.v2-library-head{align-items:flex-start;flex-direction:column}.v2-cards{grid-template-columns:1fr}.v2-steps a{padding:12px}}
+
+
+/* Dedicated Gold history quickstart: visible before the general market directory. */
+.v2-gold-quickstart{margin:0 0 20px;padding:23px 24px;border-radius:13px;border:1px solid #375c60;background:linear-gradient(115deg,#173735 0%,#162c38 58%,#1a273e 100%)}
+.v2-gold-quickstart-tag{display:block;color:#6ee1c8;font-size:10px;letter-spacing:1.5px;font-weight:800;margin-bottom:8px}
+.v2-gold-quickstart h3{font-size:23px;line-height:1.25;color:#ecfbf6;margin:0 0 10px;letter-spacing:-.35px}
+.v2-gold-quickstart p{color:#b0cbc7;font-size:12px;max-width:870px;line-height:1.7;margin:0 0 13px}
+.v2-gold-quickstart-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:17px 0}
+.v2-gold-quickstart-actions button,.v2-gold-quickstart-actions a{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:41px;border-radius:7px;padding:10px 13px;font-size:11px;font-weight:800;cursor:pointer;text-decoration:none}
+.v2-gold-primary{border:1px solid #66ddb9;background:#52d8b1;color:#10332b}
+.v2-gold-primary:disabled{opacity:.55;cursor:not-allowed;border-color:#42685c;background:#33594e;color:#c1dbce}
+.v2-gold-quickstart-actions a{color:#b9eadf;background:#1b413f;border:1px solid #3d7a6c}
+.v2-gold-upload{color:#d5eaf1;background:#25374a;border:1px solid #506e80}
+.v2-gold-quickstart-note{display:block;color:#91b4bd;font-size:10px;max-width:1000px;line-height:1.65}
+.v2-gold-quickstart-progress{display:block;color:#7de9c6;font-size:11px;margin-bottom:10px}
+.v2-gold-quickstart-error{color:#f3b6ae!important;font-size:11px!important}
+.v2-gold-append{display:flex;align-items:center;gap:9px;color:#d0e9dc;font-size:11px;line-height:1.5;cursor:pointer;text-align:left}
+.v2-gold-append input{accent-color:#5bd6b9;flex:none;width:16px;height:16px}
+@media(max-width:600px){.v2-gold-quickstart{padding:17px}.v2-gold-quickstart h3{font-size:20px}.v2-gold-quickstart-actions{flex-direction:column;align-items:stretch}.v2-gold-quickstart-actions button,.v2-gold-quickstart-actions a{width:100%}}
