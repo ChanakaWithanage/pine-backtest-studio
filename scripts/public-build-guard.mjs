@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Public V2 never downloads vendor data at build time.
- * Prevent accidentally bundling historical candles in public/history/.
+ * Block unapproved personal-use Dukascopy history in public/history/.
+ * The separately attributed CC-BY 4.0 dataset is built in /open-gold/ by
+ * prepare-licensed-gold.mjs after this guard completes.
  */
 import { readdir } from 'node:fs/promises';
 const folder = new URL('../public/history/', import.meta.url);
@@ -15,4 +16,4 @@ if (marketFiles.length && process.env.V2_PUBLIC_DATA_LICENSE_CONFIRMED !== 'yes'
   console.error('Set V2_PUBLIC_DATA_LICENSE_CONFIRMED=yes ONLY when you have redistribution rights.');
   process.exit(1);
 }
-console.log('[public v2] No automatic market-data downloads. Users import their own permitted CSV files.');
+console.log('[public v2] No unauthorized /history/ assets. Preparing the attributed CC BY Gold snapshot next.');
