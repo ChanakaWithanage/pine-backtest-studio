@@ -13,6 +13,7 @@ interface Props {
   onImport: (files: FileList | null, append: boolean) => void;
   onRestore: (bars: Candle[], name: string) => void;
   onLoadPrivateGold: () => void;
+  onLoadBundledGold: () => void;
   loadingGold: boolean;
   goldAvailable: boolean;
   progress: string;
@@ -30,7 +31,7 @@ function downloadCsv(candles: Candle[], label: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function DataLibrary({ bars, name, demo, onImport, onRestore, onLoadPrivateGold, loadingGold, goldAvailable, progress, goldError }: Props) {
+export default function DataLibrary({ bars, name, demo, onImport, onRestore, onLoadPrivateGold, onLoadBundledGold, loadingGold, goldAvailable, progress, goldError }: Props) {
   const csvInput = useRef<HTMLInputElement>(null);
   const [chosen, setChosen] = useState('XAUUSD');
   const [dragging, setDragging] = useState(false);
@@ -98,23 +99,27 @@ export default function DataLibrary({ bars, name, demo, onImport, onRestore, onL
     <section className="v2-gold-quickstart" aria-label="10-year Gold 15-minute history">
       <div className="v2-gold-quickstart-copy">
         <span className="v2-gold-quickstart-tag">GOLD HISTORY · 15-MINUTE CANDLES</span>
-        <h3>Ready to test a decade of Gold?</h3>
-        <p>Load your private history if it is configured, or download Gold 15-minute files from a data provider and import them here. Select 2016 through 2026 for a rolling ten-year window, then use the <strong>10Y</strong> range button in the backtest settings.</p>
+        <h3>Gold historical data is included</h3>
+        <p>Real XAUUSD 15-minute candles load automatically when you open the backtester. No CSV download, upload, or separate account required. Use <strong>All loaded</strong> for the full dataset. The exact starting and ending dates are shown in the workspace above.</p>
         <div className="v2-gold-quickstart-actions">
-          <button className="v2-gold-primary" type="button" onClick={() => csvInput.current?.click()}>
-            <UploadCloud size={16}/> Import Gold files / ZIP
+          <button className="v2-gold-primary" type="button" disabled={loadingGold} onClick={onLoadBundledGold}>
+            <Database size={16}/> {loadingGold ? 'Loading Gold candles…' : 'Reload included Gold history'}
           </button>
-          <a href="https://evtradelabs.com/data" target="_blank" rel="noopener noreferrer">Get XAUUSD M15 yearly data <ArrowUpRight size={15}/></a>
+          <button className="v2-gold-upload" type="button" onClick={() => csvInput.current?.click()}>
+            <UploadCloud size={16}/> Import a different data feed
+          </button>
           {goldAvailable && <button className="v2-gold-upload" type="button" disabled={loadingGold} onClick={onLoadPrivateGold}>
             <Database size={16}/> {loadingGold ? 'Loading private Gold history…' : 'Load my private 10-year history'}
           </button>}
         </div>
-        {!goldAvailable && <small className="v2-gold-quickstart-progress" role="status">
-          No hosted 10-year Gold dataset is connected. Import your permitted yearly files, or reload a dataset saved in this browser below.
-        </small>}
+        <small className="v2-gold-quickstart-progress" role="status">
+          Provided by <a href="https://huggingface.co/datasets/Yllvar/fx-historical-data" target="_blank" rel="noopener noreferrer">Yllvar / Hugging Face</a>,
+          licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.
+          This is an independent historical XAUUSD data feed, not TVC:GOLD or your broker's execution prices.
+        </small>
         {progress && <small role="status" className="v2-gold-quickstart-progress">{progress}</small>}
         {goldError && <p role="alert" className="v2-gold-quickstart-error">{goldError}</p>}
-        <small className="v2-gold-quickstart-note">The public site does not include third-party gold candles. The private loader is enabled only if an authorized /history/manifest.json dataset is available. At the provider, filter <strong>XAUUSD / M15</strong>; the current year may require a free account. Data remains in your browser when imported.</small>
+        <small className="v2-gold-quickstart-note">The built-in provider snapshot currently spans December 2017 to May 2026, approximately 8.5 years, not a complete ten-year period. The date range shown after loading is authoritative. Your Pine strategy still needs the correct point value, sizing and fee settings. You can also use your own CSV/ZIP to override the included feed.</small>
       </div>
     </section>
     <div className="v2-cards">
@@ -159,6 +164,6 @@ export default function DataLibrary({ bars, name, demo, onImport, onRestore, onL
         {status && <p role="status" className="v2-status">{status}</p>}
       </div>
     </div>
-    <p className="v2-disclaimer"><Info size={15}/> Market shortcuts link to external providers. The public site does not package or redistribute market data. Gold XAUUSD and TVC:GOLD use different price feeds, so results are not directly interchangeable.</p>
+    <p className="v2-disclaimer"><Info size={15}/> The built-in XAUUSD snapshot is distributed with attribution to its CC BY 4.0 publisher. Market shortcuts link to external providers. Other imported data stays in your browser. Gold XAUUSD, TVC:GOLD and broker CFDs can have different values and session behavior.</p>
   </section>;
 }
