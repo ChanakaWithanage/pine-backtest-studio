@@ -44,3 +44,39 @@ export function parseHostedManifest(value: unknown): HostedHistoryManifest {
   }
   return value as HostedHistoryManifest;
 }
+
+
+/**
+ * Cloudflare Pages can return the site's index.html with HTTP 200 for an
+ * unknown /history/manifest.json path (SPA fallback). A HEAD/response.ok
+ * check therefore does NOT prove that private Gold history is installed.
+ *
+ * Return null for absent or HTML fallback responses. Validate the JSON
+ * structure before enabling a hosted-history button.
+ */
+export async function readHostedHistoryManifest(response: Response): Promise<HostedHistoryManifest | null> {
+  if (response.status === 404 || response.status === 410) return null;
+  if (!response.ok) {
+    throw new Error('Historical manifest request failed (HTTP ' + response.status + ').');
+  }
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  // The manifest is small. Limit unexpected payloads rather than accepting a
+  // large HTML error page or downloading a large response as "manifest" JSON.
+  const body = await response.text();
+  if (body.length > 512 * 1024) {
+    throw new Error('Historical manifest is unexpectedly large.');
+  }
+  const trimmed = body.trimStart();
+  if (contentType.includes('text/html') || trimmed.startsWith('<')) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new Error('Historical manifest contains invalid JSON. Check /history/manifest.json.');
+  }
+  return parseHostedManifest(parsed);
+}
