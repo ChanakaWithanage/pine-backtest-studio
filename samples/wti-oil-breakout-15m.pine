@@ -806,7 +806,7 @@ if isLastBar and (showDashInput or showMathInput)
         string slStr       = rangeReady ? priceStr(slLong) + " / " + priceStr(slShort) : NO_VALUE
         string distStr     = rangeReady ? priceStr(riskLong) + " / " + priceStr(riskShort) : NO_VALUE
         string riskPctStr  = rangeReady ? str.tostring(slPctLong, "0.00") + "% / " + str.tostring(slPctShort, "0.00") + "%" : NO_VALUE
-        string riskUsdStr  = rangeReady ? str.tostring(riskLong * valuePerPointLong, "0.00") + " / " + str.tostring(riskShort * valuePerPointShort, "0.00") + symCur : NO_VALUE
+        string riskUsdStr  = rangeReady ? str.tostring(riskLong * valueLong, "0.00") + " / " + str.tostring(riskShort * valueShort, "0.00") + symCur : NO_VALUE
         string ozStr       = rangeReady ? str.tostring(valueLong, "0.####") + " / " + str.tostring(valueShort, "0.####") : NO_VALUE
         string contractsStr = rangeReady ? str.tostring(qtyLong, "0.####") + " / " + str.tostring(qtyShort, "0.####") : NO_VALUE
         string notionalStr = rangeReady ? str.tostring(valueLong * longEntry, "0") + " / " + str.tostring(valueShort * shortEntry, "0") + symCur : NO_VALUE
