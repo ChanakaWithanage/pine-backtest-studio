@@ -1,0 +1,23 @@
+name: S&P 500 fee sensitivity
+on:
+  push:
+    paths:
+      - 'scripts/research-sp500-fees.mjs'
+      - '.github/workflows/sp500-fees.yml'
+  workflow_dispatch:
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Download one-year S&P 500 index CFD candles
+        env:
+          SP500_HISTORY_BUILD: '1'
+        run: node scripts/prepare-sp500-history.mjs
+      - name: Compare short breakout commission assumptions
+        run: node --experimental-strip-types --expose-gc scripts/research-sp500-fees.mjs
