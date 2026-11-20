@@ -354,15 +354,16 @@ export default function App() {
       <main className="main">
         <div className="breadcrumb">WORKSPACE <ChevronRight size={13}/> STRATEGY BACKTESTER</div>
         <div className="headline"><div><div className="eyebrow"><i/> EXTENDED HISTORY ENGINE</div><h1>Strategy Backtester<span>.</span></h1><p>Run Pine Script strategies on your own historical data, beyond chart history limits.</p></div><button className="btn secondary" onClick={reset}><RotateCcw size={15}/> Reset demo</button></div>
-        <div className="notice"><Info size={17}/><p><strong>Default strategy: Gold Breakout 15M v1.1.0.</strong> {dataSource === 'dukascopy' ? 'Backtest candles: ten-year Dukascopy XAUUSD BID (15m), not TradingView TVC:GOLD.' : dataSource === 'demo' ? 'Loading real gold candles where available. The temporary demo uses synthetic prices, not actual gold.' : 'Custom CSV imported: its source is not verified as TVC:GOLD.'} The TVC:GOLD chart is a reference only; different gold feeds may produce different trade results.</p></div>
+        <div className="notice"><Info size={17}/><p><strong>{dataSource === 'wti' ? 'WTI Oil Breakout 15M v1.2.0.' : 'Gold Breakout 15M v1.1.0.'}</strong> {dataSource === 'wti' ? 'One year of Dukascopy LIGHT.CMD/USD 15m BID CFD candles, not CME CL futures or a TradingView oil quote.' : dataSource === 'dukascopy' ? 'Dukascopy XAUUSD BID candles, not TradingView TVC:GOLD.' : dataSource === 'demo' ? 'Temporary demo uses synthetic prices until real history loads.' : 'Imported CSV: verify the source and contract settings.'} Compare strategy results only with the correct instrument and execution costs.</p></div>
         <section className="data-strip">
-          <div className="instrument"><div className="au-icon">Au</div><div><strong>{dataSource === 'dukascopy' ? 'XAUUSD' : 'TVC:GOLD'} <span>{dataSource === 'dukascopy' ? 'DUKASCOPY BID' : 'REFERENCE'}</span></strong><small>{dataSource === 'dukascopy' ? 'Real historical 15m candles · not TVC:GOLD' : demo ? 'Synthetic demo (NOT TVC:GOLD)' : 'Imported OHLCV · source unverified'}</small></div></div>
+          <div className="instrument"><div className="au-icon">{dataSource === 'wti' ? 'Oil' : 'Au'}</div><div><strong>{dataSource === 'wti' ? 'WTI OIL' : dataSource === 'dukascopy' ? 'XAUUSD' : 'TVC:GOLD'} <span>{dataSource === 'wti' || dataSource === 'dukascopy' ? 'DUKASCOPY BID' : 'REFERENCE'}</span></strong><small>{dataSource === 'wti' ? 'WTI CFD 15m candles · not CL futures' : dataSource === 'dukascopy' ? 'Historical XAUUSD 15m · not TVC:GOLD' : demo ? 'Synthetic demonstration' : 'Imported OHLCV · source unverified'}</small></div></div>
           <div className="strip-item"><small>DATASET</small><strong title={name}>{name}</strong></div>
           <div className="strip-item"><small>AVAILABLE BARS</small><strong>{bars.length.toLocaleString()}</strong></div>
           <div className="strip-item"><small>DATA INTERVAL</small><strong>{interval || '—'}m</strong></div>
           <div className="strip-item coverage-metric"><small>HISTORY AVAILABLE (UTC)</small><strong>{coverage?.first} → {coverage?.last}</strong><small>{coverage?.years.toFixed(2)} calendar years</small></div>
           <input hidden type="file" multiple accept=".csv,text/csv" ref={csvRef} onChange={e => { void importCsv(e.target.files); }}/>
-          <button className="btn primary" disabled={fetchingHistory} onClick={() => { void loadCloudflareHistory(); }}>{fetchingHistory ? loadingProgress || 'Loading 10-year history…' : 'Load 10 years XAUUSD'}</button>
+          <button className="btn primary" disabled={fetchingHistory} onClick={() => { void loadCloudflareHistory(false, 'wti'); }}>{fetchingHistory ? loadingProgress || 'Loading history…' : 'Load WTI Oil · 1 Year + Strategy'}</button>
+           <button className="btn secondary" disabled={fetchingHistory} onClick={() => { void loadCloudflareHistory(false, 'gold'); }}>Load Gold · 10 Years</button>
           <button className="btn secondary" onClick={() => { csvModeRef.current = 'replace'; csvRef.current?.click(); }}><UploadCloud size={16}/> Import CSV files</button>
           {!demo && <button className="btn secondary" onClick={() => { csvModeRef.current = 'append'; csvRef.current?.click(); }}>Add more data</button>}
           {HISTORY_URL && <button className="btn secondary" disabled={fetchingHistory} onClick={() => { void loadHostedHistory(); }}>{fetchingHistory ? 'Loading history…' : 'Load hosted history'}</button>}
@@ -374,7 +375,7 @@ export default function App() {
               <strong>{coverageIssue ? 'Incomplete selected history' : 'Historical data coverage'}</strong>
               <p>{coverageIssue || ('Loaded candles cover ' + coverage?.first + ' through ' + coverage?.last +
                 ' (' + coverage?.count.toLocaleString() + ' bars). The date picker filters loaded history; it cannot fetch older prices.')}</p>
-              {demo && <p className="demo-history">This is only the October 2026 synthetic demonstration. These trades are not real gold backtest results.</p>}
+              {demo && <p className="demo-history">This is a synthetic demonstration, not real Gold or WTI market history.</p>}
               {importMessage && <p className="history-import-status">{importMessage}</p>}
             </div>
           </div>
@@ -385,8 +386,8 @@ export default function App() {
 
         <div className="workgrid">
           <div className="leftcol">
-            <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ Gold</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button><button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button></div></div>
-              {chartView === 'backtest' ? <><div className="chart-bar"><strong>{dataSource === 'dukascopy' ? 'DUKASCOPY:XAUUSD' : 'IMPORTED:OHLCV'} · {tf}m</strong><span>{dataSource === 'dukascopy' ? 'REAL HISTORICAL BID' : demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
+            <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ {dataSource === 'wti' ? 'WTI Oil' : 'Gold'}</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button>{dataSource !== 'wti' && <button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button>}</div></div>
+              {chartView === 'backtest' ? <><div className="chart-bar"><strong>{dataSource === 'wti' ? 'DUKASCOPY:LIGHT.CMD/USD' : dataSource === 'dukascopy' ? 'DUKASCOPY:XAUUSD' : 'IMPORTED:OHLCV'} · {tf}m</strong><span>{dataSource === 'wti' || dataSource === 'dukascopy' ? 'REAL HISTORICAL BID' : demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
                   <div className="empty-equity price-chart-empty">No candles in the selected date range. Load more history or choose available dates.</div>}<div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
               : <><div className="chart-bar"><strong>TradingView · TVC:GOLD · {tf}m</strong><span>REFERENCE ONLY</span></div><GoldReferenceChart timeframe={tf}/><div className="reference-note"><Info size={15}/> TradingView provides this display-only chart. The candles are not accessible to PineTS. Backtesting uses the separately imported CSV data, never this widget.</div><div className="panel-foot"><a href="https://www.tradingview.com/symbols/TVC-GOLD/" target="_blank" rel="noreferrer">Open TVC:GOLD on TradingView <ArrowUpRight size={13}/></a><span>Data and strategy results are not synchronized</span></div></>}
             </section>
@@ -406,7 +407,7 @@ export default function App() {
 
             {results ? <BacktestAnalysis key={results.periodStart + ':' + results.periodEnd + ':' + results.trades.length}
               results={results}
-              source={dataSource === 'dukascopy' ? 'Dukascopy XAUUSD BID (not TVC:GOLD)' : dataSource === 'demo' ? 'Synthetic demonstration (not live market data)' : 'User-imported OHLCV (source unverified)'}/>
+              source={dataSource === 'wti' ? 'Dukascopy WTI LIGHT.CMD/USD BID CFD (not CL futures)' : dataSource === 'dukascopy' ? 'Dukascopy XAUUSD BID (not TVC:GOLD)' : dataSource === 'demo' ? 'Synthetic demonstration (not live market data)' : 'User-imported OHLCV (source unverified)'}/>
               : <div className="panel analysis-awaiting">
                   <div><BarChart3 size={22}/><strong>Advanced performance analysis</strong></div>
                   <p>After running your strategy, explore Sharpe, Sortino, realized drawdown, winning/losing streaks, monthly heatmaps, weekly P&L, and long/short trade breakdowns.</p>
