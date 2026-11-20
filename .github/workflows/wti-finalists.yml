@@ -1,0 +1,23 @@
+name: WTI finalists earlier-period validation
+on:
+  push:
+    paths:
+      - 'scripts/verify-wti-finalists.mjs'
+      - '.github/workflows/wti-finalists.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Download WTI candles
+        env:
+          WTI_HISTORY_BUILD: '1'
+        run: node scripts/prepare-wti-history.mjs
+      - name: Validate finalists on earlier months and full-year data
+        run: node --experimental-strip-types --expose-gc scripts/verify-wti-finalists.mjs
