@@ -31,7 +31,7 @@ function save(text: string, name: string, mime: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function PriceChart({ bars, trades }: { bars: Candle[]; trades: Trade[] }) {
+function PriceChart({ bars, trades, fullHistory = false }: { bars: Candle[]; trades: Trade[]; fullHistory?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ref.current || !bars.length) return;
@@ -43,7 +43,9 @@ function PriceChart({ bars, trades }: { bars: Candle[]; trades: Trade[] }) {
       rightPriceScale: { borderColor: '#27394a' }
     });
     const series = chart.addSeries(CandlestickSeries, { upColor: '#38c7ac', downColor: '#ef7985', wickUpColor: '#38c7ac', wickDownColor: '#ef7985', borderVisible: false, priceFormat: { type: 'price', precision: 2, minMove: 0.01 } });
-    const shown = bars.slice(-1500);
+    // WTI 1Y is small enough to expose the whole year to chart pan/zoom.
+    // Keep the Gold 10Y chart capped for browser performance.
+    const shown = fullHistory ? bars : bars.slice(-1500);
     series.setData(shown.map(b => ({ time: Math.floor(b.time / 1000) as UTCTimestamp, open: b.open, high: b.high, low: b.low, close: b.close })));
     const beginning = shown[0].time;
     const markers = trades.flatMap(t => {
@@ -54,8 +56,11 @@ function PriceChart({ bars, trades }: { bars: Candle[]; trades: Trade[] }) {
     }).sort((a, b) => a.time - b.time);
     if (markers.length) createSeriesMarkers(series, markers);
     chart.timeScale().fitContent();
+    if (fullHistory && shown.length > 1500) {
+      chart.timeScale().setVisibleLogicalRange({ from: shown.length - 1500, to: shown.length });
+    }
     return () => chart.remove();
-  }, [bars, trades]);
+  }, [bars, trades, fullHistory]);
   return <div className="price-chart" ref={ref} aria-label="Price chart with entry and exit markers" />;
 }
 
@@ -387,8 +392,8 @@ export default function App() {
         <div className="workgrid">
           <div className="leftcol">
             <section className="panel chart-panel"><div className="panel-head"><div><small>MARKET OVERVIEW</small><h2>Price action <span>/ {dataSource === 'wti' ? 'WTI Oil' : 'Gold'}</span></h2></div><div className="chart-source-tabs"><button className={chartView === 'backtest' ? 'selected' : ''} onClick={() => setChartView('backtest')}>Backtest data</button>{dataSource !== 'wti' && <button className={chartView === 'reference' ? 'selected' : ''} onClick={() => setChartView('reference')}>TVC:GOLD</button>}</div></div>
-              {chartView === 'backtest' ? <><div className="chart-bar"><strong>{dataSource === 'wti' ? 'DUKASCOPY:LIGHT.CMD/USD' : dataSource === 'dukascopy' ? 'DUKASCOPY:XAUUSD' : 'IMPORTED:OHLCV'} · {tf}m</strong><span>{dataSource === 'wti' || dataSource === 'dukascopy' ? 'REAL HISTORICAL BID' : demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []}/> :
-                  <div className="empty-equity price-chart-empty">No candles in the selected date range. Load more history or choose available dates.</div>}<div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>Last 1,500 chart bars · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
+              {chartView === 'backtest' ? <><div className="chart-bar"><strong>{dataSource === 'wti' ? 'DUKASCOPY:LIGHT.CMD/USD' : dataSource === 'dukascopy' ? 'DUKASCOPY:XAUUSD' : 'IMPORTED:OHLCV'} · {tf}m</strong><span>{dataSource === 'wti' || dataSource === 'dukascopy' ? 'REAL HISTORICAL BID' : demo ? 'SYNTHETIC DEMO' : 'IMPORTED OHLCV'}</span></div>{selection.length ? <PriceChart bars={selection} trades={results?.trades || []} fullHistory={dataSource === 'wti'}/> :
+                  <div className="empty-equity price-chart-empty">No candles in the selected date range. Load more history or choose available dates.</div>}<div className="panel-foot"><span><Clock3 size={13}/> UTC timestamps</span><span>{dataSource === 'wti' ? 'Full WTI year available for pan / zoom' : 'Last 1,500 chart bars'} · {results ? usedBars.toLocaleString() + ' simulated' : 'run to calculate trades'}</span></div></>
               : <><div className="chart-bar"><strong>TradingView · TVC:GOLD · {tf}m</strong><span>REFERENCE ONLY</span></div><GoldReferenceChart timeframe={tf}/><div className="reference-note"><Info size={15}/> TradingView provides this display-only chart. The candles are not accessible to PineTS. Backtesting uses the separately imported CSV data, never this widget.</div><div className="panel-foot"><a href="https://www.tradingview.com/symbols/TVC-GOLD/" target="_blank" rel="noreferrer">Open TVC:GOLD on TradingView <ArrowUpRight size={13}/></a><span>Data and strategy results are not synchronized</span></div></>}
             </section>
 
