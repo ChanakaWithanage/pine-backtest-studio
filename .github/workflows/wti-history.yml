@@ -21,6 +21,8 @@ jobs:
           WTI_HISTORY_BUILD: '1'
           WTI_HISTORY_VERBOSE: '1'
         run: node scripts/prepare-wti-history.mjs
+      - name: Run the WTI breakout Pine Script on downloaded candles
+        run: node --experimental-strip-types scripts/check-wti-backtest.mjs
       - name: Validate year coverage and source manifest
         run: |
           node --input-type=module -e "
