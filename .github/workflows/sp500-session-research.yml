@@ -1,0 +1,31 @@
+name: S&P 500 session and direction research
+on:
+  push:
+    paths:
+      - 'scripts/prepare-sp500-history.mjs'
+      - 'scripts/research-sp500-sessions.mjs'
+      - '.github/workflows/sp500-session-research.yml'
+  workflow_dispatch:
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Download real one-year USA500 BID 15m candles
+        env:
+          SP500_HISTORY_BUILD: '1'
+          SP500_HISTORY_VERBOSE: '1'
+        run: node scripts/prepare-sp500-history.mjs
+      - name: Run S&P 500 48-session-and-direction split-period simulations
+        run: node --experimental-strip-types --expose-gc scripts/research-sp500-sessions.mjs
+      - name: Upload S&P research results
+        uses: actions/upload-artifact@v4
+        with:
+          name: sp500-one-year-session-study
+          path: /tmp/sp500-session-research.json
+          if-no-files-found: error
