@@ -4,12 +4,14 @@ import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, type UT
 import { createDemoCandles } from './lib/demo';
 import GoldBreakoutSource from '../samples/gold-breakout-15m.pine?raw';
 import WtiBreakoutSource from '../samples/wti-oil-breakout-15m.pine?raw';
+import Sp500BreakoutSource from '../samples/sp500-opening-range-breakout-15m.pine?raw';
 import BacktestAnalysis from './BacktestAnalysis';
 import { DEFAULT_CONTRACT } from './lib/csv-provider';
 import { DEFAULT_FEES, DEFAULT_BYBIT, planExecutionCosts, type FeeSettings, type BybitSettings } from './lib/commissions';
 import { BybitSettingsPanel, BybitResultsPanel } from './BybitComponents';
 import { parseHostedManifest } from './lib/hosted';
 import { parseWtiManifest } from './lib/wti-hosted';
+import { parseSp500Manifest } from './lib/sp500-hosted';
 import { checkRequestedCoverage, getHistoryCoverage, mergeCandleBatches, pastYearsFromLastCandle } from './lib/history';
 import { exportTrades, inferIntervalMinutes, parseCsv, resampleCandles } from './lib/csv';
 import type { Candle, Results, Trade, ContractSettings, WorkerResponse } from './types';
@@ -17,6 +19,8 @@ import type { Candle, Results, Trade, ContractSettings, WorkerResponse } from '.
 const REPO = 'https://github.com/ChanakaWithanage/pine-backtest-studio';
 const HISTORY_URL = import.meta.env.VITE_GOLD_HISTORY_URL?.trim() || '';
 const WTI_CONTRACT: ContractSettings = { pointvalue: 100, mincontract: 1, mintick: 0.01 };
+// Dukascopy USA500 CFD: $0.01 per 0.01 index point = $1 per index point, not ES or MES.
+const SP500_CONTRACT: ContractSettings = { pointvalue: 1, mincontract: 1, mintick: 0.01 };
 const OPTIONS = [{ value: 3, label: '3 minutes' }, { value: 5, label: '5 minutes' }, { value: 15, label: '15 minutes' }, { value: 30, label: '30 minutes' }, { value: 60, label: '1 hour' }, { value: 240, label: '4 hours' }];
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const money = (n: number) => Number.isFinite(n) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n) : '—';
@@ -130,7 +134,7 @@ export default function App() {
   const [fetchingHistory, setFetchingHistory] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [loadingProgress, setLoadingProgress] = useState('');
-  const [dataSource, setDataSource] = useState<'demo' | 'csv' | 'dukascopy' | 'wti'>('demo');
+  const [dataSource, setDataSource] = useState<'demo' | 'csv' | 'dukascopy' | 'wti' | 'sp500'>('demo');
   const autoLoadStarted = useRef(false);
   const historyRequestSeq = useRef(0);
   const csvModeRef = useRef<'replace' | 'append'>('replace');
@@ -159,7 +163,8 @@ export default function App() {
     // local dev) the app stays in its clearly marked synthetic demo state.
     if (autoLoadStarted.current) return;
     autoLoadStarted.current = true;
-    void loadCloudflareHistory(true, new URLSearchParams(window.location.search).get('market') === 'wti' ? 'wti' : 'gold');
+    const market = new URLSearchParams(window.location.search).get('market');
+    void loadCloudflareHistory(true, market === 'wti' ? 'wti' : market === 'sp500' ? 'sp500' : 'gold');
   }, []);
   const feePreview = useMemo(() => {
     try { return { plan: planExecutionCosts(code, fees, contract.pointvalue, contract.mintick), error: '' }; }
@@ -175,7 +180,7 @@ export default function App() {
   }, [bars, start, end, tf]);
   const stop = () => { workerRef.current?.terminate(); workerRef.current = null; setRunning(false); };
   const reset = () => { historyRequestSeq.current++; stop(); setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } }); setDataSource('demo'); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
-  function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' | 'wti' = 'csv') {
+  function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' | 'wti' | 'sp500' = 'csv') {
     stop();
     setBars(next);
     setDemo(false);
@@ -219,29 +224,27 @@ export default function App() {
     if (csvRef.current) csvRef.current.value = '';
   }
 
-  /**
-   * Load one of the Cloudflare build-generated OHLCV datasets.
-   * Manifests are validated before data is allowed into the PineTS engine.
-   */
-  async function loadCloudflareHistory(auto = false, instrument: 'gold' | 'wti' = 'gold') {
+  /** Load a validated, build-generated historical market dataset. */
+  async function loadCloudflareHistory(auto = false, instrument: 'gold' | 'wti' | 'sp500' = 'gold') {
     const seq = ++historyRequestSeq.current;
     const isWti = instrument === 'wti';
-    const label = isWti ? 'WTI Oil 1Y' : 'Gold 10Y';
+    const isSp500 = instrument === 'sp500';
+    const label = isSp500 ? 'S&P 500 1Y' : isWti ? 'WTI Oil 1Y' : 'Gold 10Y';
     setLoadingProgress('Checking hosted ' + label + ' history…');
     setFetchingHistory(true);
     try {
-      const res = await fetch(isWti ? '/history/wti/manifest.json' : '/history/manifest.json', { cache: 'no-cache' });
+      const res = await fetch(isSp500 ? '/history/sp500/manifest.json' : isWti ? '/history/wti/manifest.json' : '/history/manifest.json', { cache: 'no-cache' });
       const isJson = (res.headers.get('content-type') || '').includes('json');
-      // Static hosting sometimes responds with index.html (HTTP 200) for a
-      // missing file. Never parse HTML as historical price data.
+      // Static hosts can return index.html with HTTP 200 for nonexistent data.
       if (auto && (res.status === 404 || !isJson)) {
         setLoadingProgress('');
         return;
       }
       if (!res.ok || !isJson) {
-        throw new Error(label + ' history has not been generated on this deployment. Check the Cloudflare build logs and manifest.');
+        throw new Error(label + ' history is not available on this deployment. Check the Cloudflare build logs and manifest.');
       }
-      const manifest = isWti ? parseWtiManifest(await res.json()) : parseHostedManifest(await res.json());
+      const rawManifest: unknown = await res.json();
+      const manifest = isSp500 ? parseSp500Manifest(rawManifest) : isWti ? parseWtiManifest(rawManifest) : parseHostedManifest(rawManifest);
       const groups: Candle[][] = [];
       for (let i = 0; i < manifest.files.length; i++) {
         if (seq !== historyRequestSeq.current) return;
@@ -262,7 +265,14 @@ export default function App() {
       const merged = mergeCandleBatches(groups);
       if (merged.length !== manifest.candleCount) throw new Error('Missing historical candles after merge.');
       if (seq !== historyRequestSeq.current) return;
-      if (isWti) {
+      if (isSp500) {
+        applyHistory(merged, 'Dukascopy USA500.IDX/USD · BID · 15m', 'sp500');
+        setCode(Sp500BreakoutSource);
+        setScriptName('sp500-opening-range-breakout-15m.pine');
+        setContract({ ...SP500_CONTRACT });
+        setChartView('backtest');
+        setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } });
+      } else if (isWti) {
         applyHistory(merged, 'Dukascopy LIGHT.CMD/USD · WTI BID · 15m', 'wti');
         setCode(WtiBreakoutSource);
         setScriptName('wti-oil-breakout-15m.pine');
