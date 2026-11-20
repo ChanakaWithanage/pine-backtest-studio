@@ -3,17 +3,20 @@ import { ArrowRight, ArrowUpRight, BarChart3, Check, ChevronRight, CircleAlert, 
 import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, type UTCTimestamp } from 'lightweight-charts';
 import { createDemoCandles } from './lib/demo';
 import GoldBreakoutSource from '../samples/gold-breakout-15m.pine?raw';
+import WtiBreakoutSource from '../samples/wti-oil-breakout-15m.pine?raw';
 import BacktestAnalysis from './BacktestAnalysis';
 import { DEFAULT_CONTRACT } from './lib/csv-provider';
 import { DEFAULT_FEES, DEFAULT_BYBIT, planExecutionCosts, type FeeSettings, type BybitSettings } from './lib/commissions';
 import { BybitSettingsPanel, BybitResultsPanel } from './BybitComponents';
 import { parseHostedManifest } from './lib/hosted';
+import { parseWtiManifest } from './lib/wti-hosted';
 import { checkRequestedCoverage, getHistoryCoverage, mergeCandleBatches, pastYearsFromLastCandle } from './lib/history';
 import { exportTrades, inferIntervalMinutes, parseCsv, resampleCandles } from './lib/csv';
 import type { Candle, Results, Trade, ContractSettings, WorkerResponse } from './types';
 
 const REPO = 'https://github.com/ChanakaWithanage/pine-backtest-studio';
 const HISTORY_URL = import.meta.env.VITE_GOLD_HISTORY_URL?.trim() || '';
+const WTI_CONTRACT: ContractSettings = { pointvalue: 100, mincontract: 1, mintick: 0.01 };
 const OPTIONS = [{ value: 3, label: '3 minutes' }, { value: 5, label: '5 minutes' }, { value: 15, label: '15 minutes' }, { value: 30, label: '30 minutes' }, { value: 60, label: '1 hour' }, { value: 240, label: '4 hours' }];
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const money = (n: number) => Number.isFinite(n) ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n) : '—';
@@ -122,7 +125,7 @@ export default function App() {
   const [fetchingHistory, setFetchingHistory] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [loadingProgress, setLoadingProgress] = useState('');
-  const [dataSource, setDataSource] = useState<'demo' | 'csv' | 'dukascopy'>('demo');
+  const [dataSource, setDataSource] = useState<'demo' | 'csv' | 'dukascopy' | 'wti'>('demo');
   const autoLoadStarted = useRef(false);
   const historyRequestSeq = useRef(0);
   const csvModeRef = useRef<'replace' | 'append'>('replace');
@@ -151,7 +154,7 @@ export default function App() {
     // local dev) the app stays in its clearly marked synthetic demo state.
     if (autoLoadStarted.current) return;
     autoLoadStarted.current = true;
-    void loadCloudflareHistory(true);
+    void loadCloudflareHistory(true, new URLSearchParams(window.location.search).get('market') === 'wti' ? 'wti' : 'gold');
   }, []);
   const feePreview = useMemo(() => {
     try { return { plan: planExecutionCosts(code, fees, contract.pointvalue, contract.mintick), error: '' }; }
@@ -167,7 +170,7 @@ export default function App() {
   }, [bars, start, end, tf]);
   const stop = () => { workerRef.current?.terminate(); workerRef.current = null; setRunning(false); };
   const reset = () => { historyRequestSeq.current++; stop(); setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } }); setDataSource('demo'); setImportMessage(''); setChartView('backtest'); setContract({ ...DEFAULT_CONTRACT }); setBars(DEMO); setName('Synthetic sample'); setDemo(true); setStart(day(DEMO[0].time)); setEnd(day(DEMO[DEMO.length - 1].time)); setTf(15); setResults(null); setError(''); };
-  function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' = 'csv') {
+  function applyHistory(next: Candle[], label: string, source: 'csv' | 'dukascopy' | 'wti' = 'csv') {
     stop();
     setBars(next);
     setDemo(false);
@@ -212,32 +215,38 @@ export default function App() {
   }
 
   /**
-   * Load Cloudflare build-generated 10-year historical XAUUSD candles.
-   * Source is Dukascopy BID, never TradingView TVC:GOLD.
-   * All bars are validated before marking the dataset ready.
+   * Load one of the Cloudflare build-generated OHLCV datasets.
+   * Manifests are validated before data is allowed into the PineTS engine.
    */
-  async function loadCloudflareHistory(auto = false) {
+  async function loadCloudflareHistory(auto = false, instrument: 'gold' | 'wti' = 'gold') {
     const seq = ++historyRequestSeq.current;
-    setLoadingProgress('Checking hosted XAUUSD history…');
+    const isWti = instrument === 'wti';
+    const label = isWti ? 'WTI Oil 1Y' : 'Gold 10Y';
+    setLoadingProgress('Checking hosted ' + label + ' history…');
+    setFetchingHistory(true);
     try {
-      const res = await fetch('/history/manifest.json', { cache: 'no-cache' });
-      if (res.status === 404 && auto) {
+      const res = await fetch(isWti ? '/history/wti/manifest.json' : '/history/manifest.json', { cache: 'no-cache' });
+      const isJson = (res.headers.get('content-type') || '').includes('json');
+      // Static hosting sometimes responds with index.html (HTTP 200) for a
+      // missing file. Never parse HTML as historical price data.
+      if (auto && (res.status === 404 || !isJson)) {
         setLoadingProgress('');
         return;
       }
-      if (!res.ok) throw new Error('Historical manifest unavailable (HTTP ' + res.status + ').');
-      const manifest = parseHostedManifest(await res.json());
-      setFetchingHistory(true);
+      if (!res.ok || !isJson) {
+        throw new Error(label + ' history has not been generated on this deployment. Check the Cloudflare build logs and manifest.');
+      }
+      const manifest = isWti ? parseWtiManifest(await res.json()) : parseHostedManifest(await res.json());
       const groups: Candle[][] = [];
       for (let i = 0; i < manifest.files.length; i++) {
         if (seq !== historyRequestSeq.current) return;
-        setLoadingProgress('Loading year ' + (i + 1) + ' of ' + manifest.files.length + '…');
+        setLoadingProgress('Loading ' + label + ' segment ' + (i + 1) + '/' + manifest.files.length + '…');
         const part = manifest.files[i];
         const response = await fetch(part.file);
         if (!response.ok) throw new Error('Failed to load ' + part.file + ' (HTTP ' + response.status + ').');
-        const text = await response.text();
-        if (text.length > 24 * 1024 * 1024) throw new Error('Hosted history segment is too large.');
-        const parsed = parseCsv(text);
+        const csv = await response.text();
+        if (csv.length > 24 * 1024 * 1024) throw new Error('Hosted history segment is too large.');
+        const parsed = parseCsv(csv);
         if (parsed.length !== part.count ||
             parsed[0].time !== part.first ||
             parsed[parsed.length - 1].time !== part.last) {
@@ -248,12 +257,27 @@ export default function App() {
       const merged = mergeCandleBatches(groups);
       if (merged.length !== manifest.candleCount) throw new Error('Missing historical candles after merge.');
       if (seq !== historyRequestSeq.current) return;
-      applyHistory(merged, 'Dukascopy XAUUSD · BID · 15m', 'dukascopy');
+      if (isWti) {
+        applyHistory(merged, 'Dukascopy LIGHT.CMD/USD · WTI BID · 15m', 'wti');
+        setCode(WtiBreakoutSource);
+        setScriptName('wti-oil-breakout-15m.pine');
+        setContract({ ...WTI_CONTRACT });
+        setChartView('backtest');
+        setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } });
+      } else {
+        applyHistory(merged, 'Dukascopy XAUUSD · BID · 15m', 'dukascopy');
+        if (!auto) {
+          setCode(GoldBreakoutSource);
+          setScriptName('gold-breakout-15m.pine');
+          setContract({ ...DEFAULT_CONTRACT });
+          setChartView('backtest');
+          setFees({ ...DEFAULT_FEES, bybit: { ...DEFAULT_BYBIT } });
+        }
+      }
       setLoadingProgress('');
     } catch (e) {
       if (seq === historyRequestSeq.current) {
-        setError('Unable to load ten-year XAUUSD data: ' +
-          (e instanceof Error ? e.message : String(e)));
+        setError('Unable to load ' + label + ' data: ' + (e instanceof Error ? e.message : String(e)));
         setLoadingProgress('');
       }
     } finally {
