@@ -13,8 +13,8 @@ const manifest = JSON.parse(readFileSync('public/history/wti/manifest.json', 'ut
 const parts = manifest.files.map(part => parseCsv(readFileSync('public' + part.file, 'utf8')));
 const all = mergeCandleBatches(parts);
 if (all.length !== manifest.candleCount) throw new Error('WTI manifest count mismatch.');
-// Use the latest ~1 month for an economical runtime smoke test.
-const candles = all.slice(-2300);
+// Run the complete imported one-year WTI 15m dataset.
+const candles = all;
 const code = readFileSync('samples/wti-oil-breakout-15m.pine', 'utf8');
 const contract = { pointvalue: 100, mincontract: 1, mintick: 0.01 };
 const results = await runBacktest(code, candles, contract, DEFAULT_FEES);
