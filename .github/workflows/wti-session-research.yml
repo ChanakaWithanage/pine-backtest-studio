@@ -1,0 +1,29 @@
+name: WTI session and direction research
+on:
+  push:
+    paths:
+      - 'scripts/research-wti-sessions.mjs'
+      - '.github/workflows/wti-session-research.yml'
+  workflow_dispatch:
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Download one year of Dukascopy WTI bid 15-minute candles
+        env:
+          WTI_HISTORY_BUILD: '1'
+        run: node scripts/prepare-wti-history.mjs
+      - name: Run session × direction sweep and holdout
+        run: node --experimental-strip-types --expose-gc scripts/research-wti-sessions.mjs
+      - name: Upload complete backtest summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: wti-session-research-results
+          path: /tmp/wti-session-sweep.json
+          if-no-files-found: error
