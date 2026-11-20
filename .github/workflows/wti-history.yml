@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'scripts/prepare-wti-history.mjs'
+      - 'samples/wti-oil-breakout-15m.pine'
+      - 'scripts/check-wti-backtest.mjs'
       - '.github/workflows/wti-history.yml'
   workflow_dispatch:
 
