@@ -1,0 +1,31 @@
+name: Gold 2018 2019 2022 2023 session parameter research
+on:
+  push:
+    paths:
+      - 'scripts/fetch-gold-research-years.mjs'
+      - 'scripts/research-gold-2018-2023.mjs'
+      - '.github/workflows/gold-multiyear-research.yml'
+  workflow_dispatch:
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned project dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Download actual Dukascopy XAUUSD 15m data for 2018 2019 2022 2023
+        env:
+          GOLD_RESEARCH_YEARS: '2018,2019,2022,2023'
+        run: node scripts/fetch-gold-research-years.mjs
+      - name: Search multi-year start hour end hour and close hour combinations
+        run: node --experimental-strip-types --max-old-space-size=4096 scripts/research-gold-2018-2023.mjs
+      - name: Archive full parameter sweep outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-2018-2019-2022-2023-spread-030-sweep
+          path: data/gold-research/results/
+          if-no-files-found: error
