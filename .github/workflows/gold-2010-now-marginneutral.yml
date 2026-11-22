@@ -1,0 +1,47 @@
+name: Gold 2010–now margin-neutral sensitivity
+on:
+  push:
+    paths:
+      - 'scripts/compare-gold-2010-now-marginneutral.mjs'
+      - '.github/workflows/gold-2010-now-marginneutral.yml'
+  workflow_dispatch:
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - group: '2010-2013'
+            years: '2010,2011,2012,2013'
+          - group: '2014-2017'
+            years: '2014,2015,2016,2017'
+          - group: '2018-2021'
+            years: '2018,2019,2020,2021'
+          - group: '2022-2026'
+            years: '2022,2023,2024,2025,2026'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Download verified Dukascopy Gold yearly candles
+        env:
+          GOLD_RESEARCH_YEARS: ${{ matrix.years }}
+        run: node scripts/fetch-gold-research-years.mjs
+      - name: Compare Gold sessions at 10k capital with unchanged one-unit trades
+        env:
+          GOLD_RESEARCH_YEARS: ${{ matrix.years }}
+          GOLD_COMPARISON_GROUP: ${{ matrix.group }}
+        run: node --experimental-strip-types --expose-gc --max-old-space-size=4096 scripts/compare-gold-2010-now-marginneutral.mjs
+      - name: Archive margin-neutral annual results
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-2010-now-marginneutral-${{ matrix.group }}
+          path: |
+            data/gold-research/results/gold-long-horizon-marginneutral-${{ matrix.group }}.csv
+            data/gold-research/results/gold-long-horizon-marginneutral-${{ matrix.group }}.json
+          if-no-files-found: error
