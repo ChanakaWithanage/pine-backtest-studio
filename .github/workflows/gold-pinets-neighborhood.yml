@@ -1,0 +1,29 @@
+name: Gold original PineTS neighborhood stability
+on:
+  push:
+    paths:
+      - 'scripts/validate-gold-multiyear-neighborhood.mjs'
+      - '.github/workflows/gold-pinets-neighborhood.yml'
+  workflow_dispatch:
+jobs:
+  neighborhood:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Load actual 2018 2019 2022 2023 XAUUSD 15m candles
+        env:
+          GOLD_RESEARCH_YEARS: '2018,2019,2022,2023'
+        run: node scripts/fetch-gold-research-years.mjs
+      - name: Test nearby Gold range and close-hour configurations in original PineTS
+        run: node --experimental-strip-types --expose-gc --max-old-space-size=4096 scripts/validate-gold-multiyear-neighborhood.mjs
+      - name: Archive parameter stability results
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-2018-2019-2022-2023-pinets-neighborhood
+          path: data/gold-research/results/gold-pinets-neighborhood.json
+          if-no-files-found: error
