@@ -1,0 +1,32 @@
+name: Gold original PineTS multi-year finalist validation
+on:
+  push:
+    paths:
+      - 'scripts/validate-gold-multiyear-finalists.mjs'
+      - '.github/workflows/gold-pinets-finalists.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backtest dependencies
+        run: npm install --no-audit --no-fund
+      - name: Download four years XAUUSD 15m Dukascopy BID history
+        env:
+          GOLD_RESEARCH_YEARS: '2018,2019,2022,2023'
+        run: node scripts/fetch-gold-research-years.mjs
+      - name: Recreate broad first-pass parameter ranking
+        run: node --experimental-strip-types scripts/research-gold-2018-2023.mjs
+      - name: Exact PineTS execution check for original Gold strategy
+        run: node --experimental-strip-types --expose-gc --max-old-space-size=4096 scripts/validate-gold-multiyear-finalists.mjs
+      - name: Upload validated results and complete search tables
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-2018-2019-2022-2023-pinets-validated
+          path: data/gold-research/results/
+          if-no-files-found: error
