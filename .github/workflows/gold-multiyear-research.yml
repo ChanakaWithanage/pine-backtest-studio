@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install pinned project dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
       - name: Download actual Dukascopy XAUUSD 15m data for 2018 2019 2022 2023
         env:
           GOLD_RESEARCH_YEARS: '2018,2019,2022,2023'
