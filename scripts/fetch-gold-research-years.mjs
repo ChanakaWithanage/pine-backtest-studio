@@ -20,12 +20,20 @@ await mkdir(folder, { recursive: true });
 const deadline = Date.now() + 18 * 60_000;
 
 function date(y) { return y + '-01-01'; }
+function endDate(y) {
+  const now = new Date();
+  if (y < now.getUTCFullYear()) return date(y + 1);
+  // Current calendar year is partial; Dukascopy accepts the next UTC date as
+  // exclusive upper bound and returns only already published candles.
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+    .toISOString().slice(0, 10);
+}
 function download(y) {
   return new Promise((resolve, reject) => {
     const file = 'xauusd-bid-m15-' + y + '.csv';
     const args = [
       '--no-install', 'dukascopy-node', '-i', 'xauusd',
-      '-from', date(y), '-to', date(y + 1),
+      '-from', date(y), '-to', endDate(y),
       '-t', 'm15', '-p', 'bid', '-f', 'csv', '-v',
       '-dir', folder, '-fn', file.replace('.csv', ''),
       '--batch-size', '16', '--batch-pause', '250',
@@ -59,7 +67,7 @@ async function verify(y, filename) {
     if (line.startsWith('timestamp,') || !line.trim()) continue;
     const [time,open,high,low,close] = line.split(',').slice(0,5).map(Number);
     if (![time,open,high,low,close].every(Number.isFinite) ||
-      time < Date.parse(date(y)) || time >= Date.parse(date(y+1)) ||
+      time < Date.parse(date(y)) || time >= Date.parse(endDate(y)) ||
       (last!==null && time<=last) || open<=0 || high<Math.max(open,close,low) || low>Math.min(open,close) ) {
       throw Error('Bad XAUUSD OHLCV or time sequence in '+y);
     }
@@ -68,10 +76,13 @@ async function verify(y, filename) {
     min=Math.min(min,low); max=Math.max(max,high);
     count++;
   }
-  if (count < 18_000 || first-Date.parse(date(y)) > 9*86_400_000 ||
-    Date.parse(date(y+1))-last > 9*86_400_000) throw Error('Missing substantial historical XAUUSD coverage for '+y+': '+count);
-  console.log('[GOLD RESEARCH] YEAR '+JSON.stringify({year:y,candles:count,first:new Date(first).toISOString(),last:new Date(last).toISOString(),minPrice:+min.toFixed(2),maxPrice:+max.toFixed(2),bytes:info.size}));
-  return {year:y,filename,file,count,first,last,min,max};
+  const requestedFraction = (Date.parse(endDate(y)) - Date.parse(date(y))) /
+    (Date.parse(date(y + 1)) - Date.parse(date(y)));
+  const minimumBars = Math.floor(18_000 * requestedFraction);
+  if (count < minimumBars || first-Date.parse(date(y)) > 9*86_400_000 ||
+    Date.parse(endDate(y))-last > 9*86_400_000) throw Error('Missing substantial historical XAUUSD coverage for '+y+': '+count);
+  console.log('[GOLD RESEARCH] YEAR '+JSON.stringify({year:y,candles:count,first:new Date(first).toISOString(),last:new Date(last).toISOString(),toExclusive:endDate(y),minPrice:+min.toFixed(2),maxPrice:+max.toFixed(2),bytes:info.size}));
+  return {year:y,filename,file,count,first,last,min,max,toExclusive:endDate(y)};
 }
 let cursor=0;
 const outputs=[];
