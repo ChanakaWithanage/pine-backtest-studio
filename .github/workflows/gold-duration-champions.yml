@@ -1,0 +1,29 @@
+name: Gold original PineTS window-duration champions
+on:
+  push:
+    paths:
+      - 'scripts/validate-gold-duration-champions.mjs'
+      - '.github/workflows/gold-duration-champions.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Fetch 2018 2019 2022 2023 XAUUSD 15m source
+        env:
+          GOLD_RESEARCH_YEARS: '2018,2019,2022,2023'
+        run: node scripts/fetch-gold-research-years.mjs
+      - name: Validate 2h 3h 4h 6h 7h 8h 10h 12h windows with original Gold Pine
+        run: node --experimental-strip-types --expose-gc --max-old-space-size=4096 scripts/validate-gold-duration-champions.mjs
+      - name: Archive duration comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-pinets-duration-champions
+          path: data/gold-research/results/gold-pinets-duration-champions.json
+          if-no-files-found: error
